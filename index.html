@@ -373,7 +373,8 @@ threadIndicatorDropdown.addEventListener('change', function() {
     } else if (value === "custom") {
         let customSymbol = prompt("Enter the symbol to use:");
 
-        if (customSymbol && customSymbol.length === 1) {
+        if (customSymbol) {
+            customSymbol = customSymbol.trim();
             this.options[this.selectedIndex].text = customSymbol;
             this.options[this.selectedIndex].value = customSymbol;
             threadIndicatorSymbol = customSymbol;

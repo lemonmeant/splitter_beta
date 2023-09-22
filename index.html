@@ -106,9 +106,9 @@ button[data-tooltip]:hover:after, label[data-tooltip]:hover:after {
 
 
 .skeet {
-    display: flex;  /* Set the .skeet to use flexbox */
-    justify-content: space-between;  /* Space out the children of .skeet (text and copy button) */
-    align-items: start;  /* Align items to the top */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;  /* Center align the items vertically */
     border: 1px solid #74b8f9;
     padding: 10px;
     margin-top: 10px;
@@ -117,15 +117,19 @@ button[data-tooltip]:hover:after, label[data-tooltip]:hover:after {
     border-radius: 5px;
 }
 
+
 .skeet .copy {
     margin-left: 10px;  /* Space between text and copy button */
     background-color: #454d59;
     flex-shrink: 0;  /* Prevent button from shrinking */
 }
 
-.skeet-content {  /* New class for the content inside .skeet, excluding the copy button */
-    flex-grow: 1;  /* Allow content to take up maximum available space */
+.skeet-content {
+    flex-grow: 1;
+    word-break: break-word;  /* Allows the breaking of long words/links */
+    overflow-wrap: break-word;  /* Wraps long words/links */
 }
+
 
 
 .dark-mode {
@@ -328,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 const INPUT_MAX_LENGTH = 300;
-const BUFFER = 5;
+const BUFFER = 10;
 const PUNCTUATIONS = [".", "!", "?", "…"];
 const BRACKET_PAIRS = {
     '(': ')',
@@ -484,28 +488,36 @@ function segmentText() {
                                      .replace(/\s+([\)\]\}])/g, '$1')
                                      .trim();
 
-    let segments = [];
-    let currentIndex = 0;
-
-    while (currentIndex < cleanedText.length) {
-        let segmentEnd = getSegmentEnd(cleanedText.slice(currentIndex, currentIndex + INPUT_MAX_LENGTH - BUFFER), INPUT_MAX_LENGTH - BUFFER);
-        let segment = cleanedText.slice(currentIndex, currentIndex + segmentEnd);
+    let parts = cleanedText.split("##").map(part => part.trim()); // Added .map() to trim each part
+    
+    let allSegments = [];
+    
+    for (let part of parts) {
+        let segments = [];
+        let currentIndex = 0;
         
-        if (!segmentEnd || !segment) {
-            alert('Unable to segment the text properly. Please check the input.');
-            break;
+        while (currentIndex < part.length) {
+            let segmentEnd = getSegmentEnd(part.slice(currentIndex, currentIndex + INPUT_MAX_LENGTH - BUFFER), INPUT_MAX_LENGTH - BUFFER);
+            let segment = part.slice(currentIndex, currentIndex + segmentEnd);
+            
+            if (!segmentEnd || !segment) {
+                alert('Unable to segment the text properly. Please check the input.');
+                break;
+            }
+            
+            if (segment) {
+                segments.push(segment);
+            }
+
+            currentIndex += segmentEnd;
         }
-
-
-        if (segment) {
-            segments.push(segment);
-        }
-
-        currentIndex += segmentEnd;
+        
+        allSegments = allSegments.concat(segments);
     }
 
-    renderSegments(segments);
+    renderSegments(allSegments);
 }
+
 
 const excludeCounterCheckbox = document.getElementById('excludeCounterCheckbox');
 

@@ -261,6 +261,7 @@ label[data-tooltip] {
     <textarea id="inputText" placeholder="Type your long post here..."></textarea>
     <p id="charCount">0 characters</p>
     <button id="segmentButton" data-tooltip="Click to segment your message into thread">Segment</button>
+    <button id="cleanButton" data-tooltip="Click to clear the text area">Clean</button>
     <select id="threadIndicatorDropdown">
         <option value="default">No emoji</option>
         <option value="🧵">🧵</option>
@@ -277,6 +278,32 @@ label[data-tooltip] {
     <div id="skeetsDisplay"></div>
 
     <script>
+
+// Constants
+const EXPIRATION_TIME = 2 * 24 * 60 * 60 * 1000; // 2 days in milliseconds
+
+// Backup the original setItem and getItem methods
+const originalSetItem = localStorage.setItem;
+const originalGetItem = localStorage.getItem;
+
+localStorage.setItem = function(key, value) {
+    const timestampKey = key + "-timestamp";
+    originalSetItem.call(localStorage, timestampKey, new Date().getTime());
+    return originalSetItem.call(localStorage, key, value);
+};
+
+localStorage.getItem = function(key) {
+    const timestampKey = key + "-timestamp";
+    const savedTimestamp = originalGetItem.call(localStorage, timestampKey);
+    const currentTime = new Date().getTime();
+    if (!savedTimestamp || currentTime - savedTimestamp > EXPIRATION_TIME) {
+        localStorage.removeItem(key);           // Remove the expired data
+        localStorage.removeItem(timestampKey);  // Remove its timestamp
+        return null; // Return null if the data has expired
+    }
+    return originalGetItem.call(localStorage, key);
+};
+
 
 let copiedButtons = [];
 
@@ -577,6 +604,16 @@ inputText.addEventListener('input', () => {
 });
 
 segmentButton.addEventListener('click', segmentText);
+
+function cleanTextArea() {
+    inputText.value = ''; // Clear the text area
+    charCount.innerText = '0 characters'; // Reset the character counter
+    skeetsDisplay.innerHTML = ''; // Clear the rendered segments
+    localStorage.removeItem('savedText'); // Remove the saved input text from local storage
+}
+
+const cleanButton = document.getElementById('cleanButton');
+cleanButton.addEventListener('click', cleanTextArea);
 
 
     </script>

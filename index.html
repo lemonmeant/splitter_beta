@@ -631,12 +631,12 @@ input[type="text"]:focus, input[type="password"]:focus {
 
     <script>
 
-// Constants
-const EXPIRATION_TIME = 172800000; // 2 days in milliseconds
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
+const CREDENTIALS_EXPIRATION_TIME = 30 * DAY_IN_MILLISECONDS; // 30 days
+const DEFAULT_EXPIRATION_TIME = 2 * DAY_IN_MILLISECONDS; // 2 days
 
-// Backup the original setItem and getItem methods
-const originalSetItem = localStorage.setItem;
-const originalGetItem = localStorage.getItem;
+const originalSetItem = localStorage.setItem.bind(localStorage);
+const originalGetItem = localStorage.getItem.bind(localStorage);
 
 localStorage.setItem = function(key, value) {
     const timestampKey = key + "-timestamp";
@@ -648,7 +648,15 @@ localStorage.getItem = function(key) {
     const timestampKey = key + "-timestamp";
     const savedTimestamp = originalGetItem.call(localStorage, timestampKey);
     const currentTime = new Date().getTime();
-    if (!savedTimestamp || currentTime - savedTimestamp > EXPIRATION_TIME) {
+    let expirationTime;
+
+    if (key === 'obfuscatedCredentials') {
+        expirationTime = CREDENTIALS_EXPIRATION_TIME;
+    } else {
+        expirationTime = DEFAULT_EXPIRATION_TIME;
+    }
+
+    if (!savedTimestamp || currentTime - savedTimestamp > expirationTime) {
         localStorage.removeItem(key);           // Remove the expired data
         localStorage.removeItem(timestampKey);  // Remove its timestamp
         return null; // Return null if the data has expired
@@ -1121,10 +1129,16 @@ async function postThread(credentials) {
 
 
 async function loginAndStartThreadPosting() {
-    const handle = document.getElementById('handle').value;
-    const appPassword = document.getElementById('appPassword').value;
+    const handle = document.getElementById('handle').value.trim();
+    const appPassword = document.getElementById('appPassword').value.trim();
+
+    // Check if handle and appPassword are provided
+    if (!handle || !appPassword) {
+        alert("Please enter correct credentials.");
+        return;
+    }
+
     const credentials = JSON.stringify({ handle, appPassword });
-    
     const obfuscatedCredentials = obfuscate(credentials);
     
     localStorage.setItem('obfuscatedCredentials', obfuscatedCredentials);
@@ -1132,6 +1146,7 @@ async function loginAndStartThreadPosting() {
     closeLoginPopup();
     postThread({ handle, appPassword });
 }
+
 
 
 

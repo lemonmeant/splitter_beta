@@ -488,6 +488,93 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 
 
+@media only screen and (max-width: 600px) {
+    body {
+        padding: 10px;
+        font-size: 16px;  /* Adjusted for better readability on mobile */
+    }
+
+    /* Making input elements and buttons stretch to the full width */
+    textarea, select, button, #skeetsDisplay {
+        width: 100%;
+        margin-right: 0;
+        margin-left: 0;
+    }
+
+    /* Adjusting the modal to fit better on smaller screens */
+    .modal-content {
+        width: 90%;
+        margin: 20% auto;
+    }
+
+    /* Increasing button padding for more comfortable tapping */
+    button, .login-button {
+        padding: 12px 20px;
+    }
+
+    /* Adjusting margins for buttons for better spacing */
+    #segmentButton, #cleanButton, #postThreadButton {
+        margin-bottom: 10px;
+    }
+
+    /* Adjusting the language select dropdown for mobile */
+    #languageSelect {
+        width: 100%;
+        position: relative;
+        display: block;
+    }
+
+    /* Adjusting container layouts for mobile */
+    .selectors-container, .language-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;  /* Adding a gap for better spacing */
+    }
+    
+    /* Adjusting dropdowns for mobile */
+    .language-dropdown, #threadIndicatorDropdown {
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 5px;
+    }
+    
+    .language-button, #threadIndicatorButton {
+        padding-right: 25px; /* Additional space for the dropdown indicator */
+        background: none; /* Removing the background for mobile */
+    }
+    
+    /* Adjustments for the checkbox */
+    input[type="checkbox"] {
+        margin-right: 10px;
+        margin-top: 5px; /* Adding a top margin for better spacing */
+        background-color: #fff;
+        border: 1px solid #74b8f9;
+        border-radius: 3px;
+        width: 20px;
+        height: 20px;
+    }
+    
+    label[for="counterExcludeCheckbox"] {
+        display: flex;
+        align-items: center;
+    }
+    
+     .selectors-container {
+            flex-direction: row; /* Layout items in a row */
+            justify-content: space-between; /* Space items apart as much as possible */
+            gap: 5px;  /* Slight gap between items */
+        }
+        
+        /* Adjusting dropdowns for mobile */
+        .language-dropdown, #threadIndicatorDropdown {
+            width: 48%; /* Each takes up roughly half the available width, accounting for the gap */
+            margin-top: 5px;
+            border-radius: 5px;
+        }
+}
+
+
+
     </style>
 
 

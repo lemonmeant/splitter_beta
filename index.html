@@ -573,6 +573,42 @@ input[type="text"]:focus, input[type="password"]:focus {
         }
 }
 
+#logoutLink {
+    color: #1b79f3;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+#logoutLink:hover {
+    color: #679cec;
+}
+
+.dark-mode #logoutLink {
+    color: #888;
+}
+
+#loader {
+    border: 8px solid #f3f3f3;
+    border-radius: 50%;
+    border-top: 8px solid #3498db; /* Blue */
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    display: none;
+    margin: auto;
+}
+
+.dark-mode #loader {
+    border-top: 8px solid #888;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+
 
 
     </style>
@@ -626,7 +662,7 @@ input[type="text"]:focus, input[type="password"]:focus {
 
     
     
-    
+    <div id="loader"></div>
     <div id="skeetsDisplay"></div>
 
     <script>
@@ -1089,6 +1125,10 @@ async function postThread(credentials) {
         return;
     }
 
+    // Show the loader
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
+
     try {
         const session = await createSession(handle, appPassword);
         let rootMetadata = null;
@@ -1123,8 +1163,12 @@ async function postThread(credentials) {
     } catch (error) {
         console.error('Error:', error);
         alert('Failed to post. Check the browser console for more details.');
+    } finally {
+        // Hide the loader
+        loader.style.display = 'none';
     }
 }
+
 
 
 
@@ -1403,6 +1447,40 @@ searchInput.addEventListener('input', filterLanguages);
 
 
 document.getElementById("postThreadButton").addEventListener("click", showLoginPopupIfNeeded);
+
+function checkCredentials() {
+    const credentials = localStorage.getItem('obfuscatedCredentials');
+    if (credentials) {
+        displayLogoutLink();
+    }
+}
+
+function displayLogoutLink() {
+    const logoutLink = document.createElement('a');
+    logoutLink.href = "#";
+    logoutLink.innerText = "Logout";
+    logoutLink.id = "logoutLink";
+    logoutLink.style.textAlign = "center";
+    logoutLink.style.display = "block";
+    logoutLink.style.marginTop = "20px";
+    logoutLink.style.cursor = "pointer";
+    logoutLink.addEventListener('click', handleLogout);
+
+    const skeetsDisplay = document.getElementById('skeetsDisplay');
+    skeetsDisplay.insertAdjacentElement('afterend', logoutLink);
+}
+
+
+function handleLogout(event) {
+    event.preventDefault();
+    localStorage.removeItem('obfuscatedCredentials');
+    localStorage.removeItem('obfuscatedCredentials-timestamp');
+    const logoutLink = document.getElementById('logoutLink');
+    logoutLink.remove();
+}
+
+document.addEventListener('DOMContentLoaded', checkCredentials);
+
 
 
     </script>

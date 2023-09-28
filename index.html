@@ -571,6 +571,16 @@ input[type="text"]:focus, input[type="password"]:focus {
             margin-top: 5px;
             border-radius: 5px;
         }
+        button:not(.copy) {
+            width: 100%; /* Full width on mobile */
+            margin: 10px 0; /* Some margin to separate them from other elements */
+        }
+        
+       .skeet .copy {
+            width: auto; /* Reset to natural width */
+            margin: 0;   /* Remove any added margin */
+        }
+    
 }
 
 #logoutLink {
@@ -909,6 +919,8 @@ threadIndicatorDropdown.addEventListener('change', function() {
 
         if (customSymbol) {
             customSymbol = customSymbol.trim();
+            
+            customSymbol = customSymbol[0];
 
             // Check if changeEmoji option already exists, if not create it.
             let changeEmojiOption = Array.from(this.options).find(opt => opt.value === "changeEmoji");

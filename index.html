@@ -1138,7 +1138,8 @@ async function compressImage(file) {
 async function stripExif(file) {
     return new Promise((resolve, reject) => {
         let img = new Image();
-        img.src = URL.createObjectURL(file);
+        let objectURL = URL.createObjectURL(file);
+        img.src = objectURL;
 
         img.onload = function() {
             let canvas = document.createElement('canvas');
@@ -1156,11 +1157,13 @@ async function stripExif(file) {
             }
 
             canvas.toBlob(blob => {
+                URL.revokeObjectURL(objectURL);  // Revoke the object URL after its use
                 resolve(new Blob([blob], { type: outputType }));
             }, outputType);
         };
 
         img.onerror = function() {
+            URL.revokeObjectURL(objectURL);  // Revoke the object URL if there's an error
             reject(new Error("Error processing image for EXIF removal"));
         };
     });
@@ -1315,57 +1318,149 @@ let lastSegmentedContent = '';
 let lastThreadIndicatorSymbol = '';
 let lastExcludeCounterState = false;
 
+function weightedLevenshteinDistance(str1, str2) {
+    if (str1 === str2) return 0;
+    if (str1.length === 0) return str2.length;
+    if (str2.length === 0) return str1.length;
+
+    let matrix = [];
+
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            let substitutionCost = (str1.charAt(j - 1) === str2.charAt(i - 1)) ? 0 : 1.5; // Increased weight for substitutions
+            matrix[i][j] = Math.min(matrix[i - 1][j - 1] + substitutionCost, 
+                                    matrix[i][j - 1] + 1, 
+                                    matrix[i - 1][j] + 1);
+        }
+    }
+
+    return matrix[str2.length][str1.length];
+}
+
+function similarityScore(str1, str2) {
+    let distance = weightedLevenshteinDistance(str1, str2);
+    let maxLength = Math.max(str1.length, str2.length);
+    let score = (maxLength - distance) / maxLength;
+
+    // Bonus for common prefix or suffix
+    let prefixLength = 0;
+    while (prefixLength < str1.length && prefixLength < str2.length && str1[prefixLength] === str2[prefixLength]) {
+        prefixLength++;
+    }
+    score += prefixLength / (2 * maxLength); // Adjust this bonus as needed
+
+    return Math.min(score, 1); // Ensure the score remains between 0 and 1
+}
+
+
 function renderSegments(segments) {
     const currentContent = document.querySelector('textarea').value;
     const currentThreadIndicatorSymbol = threadIndicatorSymbol;
     const currentExcludeCounterState = document.getElementById('excludeCounterCheckbox').checked;
 
-    // Check if the content, thread indicator, and counter state have not changed
     if (lastSegmentedContent === currentContent &&
         lastThreadIndicatorSymbol === currentThreadIndicatorSymbol &&
         lastExcludeCounterState === currentExcludeCounterState) {
-        // If no changes, exit the function early
         return;
     }
 
-    // If there were changes, update the last state variables
+    let backupSkeetImagesMap = new Map([...skeetImagesMap.entries()]);
+    let oldSkeetContents = Array.from(skeetsDisplay.children);
+    skeetImagesMap.clear();
+
     lastSegmentedContent = currentContent;
     lastThreadIndicatorSymbol = currentThreadIndicatorSymbol;
     lastExcludeCounterState = currentExcludeCounterState;
-    
+
     skeetsDisplay.innerHTML = '';
+
     segments.forEach((seg, index) => {
         let excludeCounter = document.getElementById('excludeCounterCheckbox').checked;
-        let threadIndicator = "";
-        
-        if (excludeCounter) {
-            threadIndicator = threadIndicatorSymbol ? `${threadIndicatorSymbol} ` : "";
-        } else {
-            threadIndicator = threadIndicatorSymbol ? `${threadIndicatorSymbol} ${index + 1}/${segments.length}\n` : `${index + 1}/${segments.length}\n`;
-        }
+        let threadIndicator = excludeCounter
+            ? (threadIndicatorSymbol ? `${threadIndicatorSymbol} ` : "")
+            : (threadIndicatorSymbol ? `${threadIndicatorSymbol} ${index + 1}/${segments.length}\n` : `${index + 1}/${segments.length}\n`);
 
         let skeetDiv = document.createElement('div');
         let skeetID = `skeet-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         skeetDiv.id = skeetID;
-        skeetImagesMap.set(skeetID, []);
         skeetDiv.classList.add('skeet');
 
         let skeetInnerDiv = document.createElement('div');
         skeetInnerDiv.classList.add('skeet-inner');
 
-        // Create and append the segment text
         let skeetContentDiv = document.createElement('div');
         skeetContentDiv.classList.add('skeet-content');
-        let skeetContentHTML = `${threadIndicator.replace('\n', '<br>')}${seg.replace(/\n/g, "<br>")}`;
-        skeetContentDiv.innerHTML = skeetContentHTML;
+        skeetContentDiv.innerHTML = `${threadIndicator.replace('\n', '<br>')}${seg.replace(/\n/g, "<br>")}`;
         skeetInnerDiv.appendChild(skeetContentDiv);
 
-        // Create and append the container for image thumbnails directly below the segment text
         let thumbnailContainer = document.createElement('div');
         thumbnailContainer.classList.add('thumbnail-container');
         skeetInnerDiv.appendChild(thumbnailContainer);
 
         skeetDiv.appendChild(skeetInnerDiv);
+
+        let bestMatchScore = 0;
+        let bestMatchID = null;
+
+        for (let oldSkeetDiv of oldSkeetContents) {
+            let oldContent = oldSkeetDiv.querySelector('.skeet-content').textContent;
+            let score = similarityScore(oldContent, seg);
+            if (score > bestMatchScore) {
+                bestMatchScore = score;
+                bestMatchID = oldSkeetDiv.id;
+            }
+        }
+
+        if (bestMatchID) {
+            let images = backupSkeetImagesMap.get(bestMatchID) || [];
+            skeetImagesMap.set(skeetID, images);
+            backupSkeetImagesMap.delete(bestMatchID);
+        } else {
+            skeetImagesMap.set(skeetID, []);
+        }
+
+        let images = skeetImagesMap.get(skeetID);
+        for (let imageDetails of images) {
+            let thumbnail = document.createElement('div');
+            thumbnail.classList.add('thumbnail');
+
+            let img = document.createElement('img');
+            img.src = URL.createObjectURL(imageDetails.data);
+            thumbnail.appendChild(img);
+
+            let removeIcon = document.createElement('span');
+            removeIcon.classList.add('remove-thumbnail');
+            removeIcon.innerHTML = '&times;';
+            removeIcon.onclick = function() {
+                thumbnailContainer.removeChild(thumbnail);
+                let images = skeetImagesMap.get(skeetID) || [];
+                let index = images.indexOf(imageDetails);
+                if (index !== -1) {
+                    images.splice(index, 1);
+                }
+                skeetImagesMap.set(skeetID, images);
+            };
+            thumbnail.appendChild(removeIcon);
+
+            let editAltButton = document.createElement('span');
+            editAltButton.innerHTML = '✎';  
+            editAltButton.classList.add('edit-thumbnail');  
+            editAltButton.onclick = async function() {
+                const altText = await askForAltText(imageDetails.data, imageDetails.alt);
+                imageDetails.alt = altText;
+            };
+            thumbnail.appendChild(editAltButton);
+
+            thumbnailContainer.appendChild(thumbnail);
+        }
 
         // Create a container for the "Copy" and "Add Pic" buttons
         let buttonContainer = document.createElement('div');
@@ -1393,9 +1488,6 @@ function renderSegments(segments) {
         // Add the button container to the skeet div
         skeetDiv.appendChild(buttonContainer);
 
-        // Initialize the map for storing images related to this skeetDiv
-        // skeetImagesMap.set(skeetDiv, []);
-        
         skeetDiv.style.opacity = '0';
         skeetsDisplay.appendChild(skeetDiv);
         setTimeout(() => {
@@ -1403,12 +1495,6 @@ function renderSegments(segments) {
         }, 100 * index);
     });
 }
-
-
-
-
-
-
 
 
 
@@ -1426,11 +1512,31 @@ inputText.addEventListener('input', () => {
 segmentButton.addEventListener('click', segmentText);
 
 function cleanTextArea() {
-    inputText.value = ''; // Clear the text area
-    charCount.innerText = '0 characters'; // Reset the character counter
-    skeetsDisplay.innerHTML = ''; // Clear the rendered segments
-    localStorage.removeItem('savedText'); // Remove the saved input text from local storage
+    // Clear the text area
+    inputText.value = '';
+
+    // Reset the character counter
+    charCount.innerText = '0 characters';
+
+    // Clear the rendered segments
+    skeetsDisplay.innerHTML = '';
+
+    // Remove the saved input text from local storage
+    localStorage.removeItem('savedText');
+
+    // Clear backup and other maps or arrays if they exist
+    if (backupSkeetImagesMap) backupSkeetImagesMap.clear();
+    if (skeetImagesMap) skeetImagesMap.clear();
+
+    // Reset other tracked variables
+    lastSegmentedContent = '';
+    lastThreadIndicatorSymbol = '';
+    lastExcludeCounterState = false;
+
+    // If there are any other global variables or objects that should be cleared,
+    // set them to null or reset them here.
 }
+
 
 const cleanButton = document.getElementById('cleanButton');
 cleanButton.addEventListener('click', cleanTextArea);

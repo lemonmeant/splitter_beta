@@ -788,8 +788,8 @@ input[type="text"]:focus {
 
     
     
-    <input type="checkbox" id="excludeCounterCheckbox" style="margin-left: 10px;">
-    <label for="excludeCounterCheckbox" data-tooltip="Exclude the segment counter (like 1/n) from each thread segment">❌🔢</label>
+    <input type="checkbox" id="excludeCounterCheckbox" style="margin-left: 10px;" checked>
+    <label for="excludeCounterCheckbox" data-tooltip="Exclude the segment counter (like 1/n) from each thread segment">🔢</label>
 <div id="loginPopup" class="modal">
     <div class="modal-content">
         <span class="close-button" onclick="closeLoginPopup()">&times;</span>
@@ -1351,11 +1351,11 @@ function similarityScore(str1, str2) {
     let score = (maxLength - distance) / maxLength;
 
     // Bonus for common prefix or suffix
-    let prefixLength = 0;
-    while (prefixLength < str1.length && prefixLength < str2.length && str1[prefixLength] === str2[prefixLength]) {
-        prefixLength++;
-    }
-    score += prefixLength / (2 * maxLength); // Adjust this bonus as needed
+    // let prefixLength = 0;
+   // while (prefixLength < str1.length && prefixLength < str2.length && str1[prefixLength] === str2[prefixLength]) {
+       // prefixLength++;
+   // }
+    // score += prefixLength / (2 * maxLength); // Adjust this bonus as needed
 
     return Math.min(score, 1); // Ensure the score remains between 0 and 1
 }
@@ -1383,7 +1383,7 @@ function renderSegments(segments) {
     skeetsDisplay.innerHTML = '';
 
     segments.forEach((seg, index) => {
-        let excludeCounter = document.getElementById('excludeCounterCheckbox').checked;
+        let excludeCounter = !document.getElementById('excludeCounterCheckbox').checked;
         let threadIndicator = excludeCounter
             ? (threadIndicatorSymbol ? `${threadIndicatorSymbol} ` : "")
             : (threadIndicatorSymbol ? `${threadIndicatorSymbol} ${index + 1}/${segments.length}\n` : `${index + 1}/${segments.length}\n`);

@@ -1633,7 +1633,7 @@ function parse_pattern(text, regex, groupName, offset) {
 function parse_mentions(text) {
     // Match mentions that are at the start, end, or surrounded by whitespace or specific delimiters
     const mention_regex = /(?:^|[\s])@(?<handle>[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(?=$|[\s\W])/g;
-    return parse_pattern(text, mention_regex, 'handle', 2); // offset is +4 for mentions
+    return parse_pattern(text, mention_regex, 'handle', 1); // offset is +4 for mentions
 }
 
 function parse_urls(text) {

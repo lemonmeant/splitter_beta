@@ -1616,30 +1616,39 @@ async function askForAltText(imageSrc, currentAlt = '') {
     });
 }
 
-function parse_pattern(text, regex, groupName, offset) {
+function getByteLength(str) {
+    return new Blob([str]).size;
+}
+
+function parse_pattern(text, regex, groupName) {
     let spans = [];
     let m;
+    let byteOffset = 0;  // Start with zero offset
+
     while (m = regex.exec(text)) {
         const matchedGroup = m.groups[groupName];
+        const startByteIndex = byteOffset + getByteLength(text.substring(0, m.index)) + getByteLength(m[0]) - getByteLength(matchedGroup);
+        const endByteIndex = startByteIndex + getByteLength(matchedGroup);
+
         spans.push({
-            start: offset + m.index,
-            end: m.index + matchedGroup.length + offset,
+            start: startByteIndex,
+            end: endByteIndex,
             [groupName]: matchedGroup
         });
+
+        byteOffset += getByteLength(m[0]);
     }
     return spans;
 }
 
 function parse_mentions(text) {
-    // Match mentions that are at the start, end, or surrounded by whitespace or specific delimiters
-    const mention_regex = /(?:^|[\s])@(?<handle>[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(?=$|[\s\W])/g;
-    return parse_pattern(text, mention_regex, 'handle', 1); // offset is +4 for mentions
+    const mention_regex = /[$|\W]@(?<handle>([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)/g;
+    return parse_pattern(text, mention_regex, 'handle');
 }
 
 function parse_urls(text) {
-    // Match URLs that are at the start, end, or surrounded by whitespace or specific delimiters
-    const url_regex = /(?:^|[\s\W])(?<url>https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@%_\+~#//=])?)(?=$|[\s\W])/g;
-    return parse_pattern(text, url_regex, 'url', 2);
+    const url_regex = /[$|\W](?<url>https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@%_\+~#//=])?)/g;
+    return parse_pattern(text, url_regex, 'url');
 }
 
 

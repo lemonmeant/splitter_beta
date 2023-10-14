@@ -1642,9 +1642,11 @@ function parse_pattern(text, regex, groupName) {
 }
 
 function parse_mentions(text) {
-    const mention_regex = /[$|\W]@(?<handle>([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)/g;
+    // Correctly capture the '@' symbol and the subsequent handle.
+    const mention_regex = /[$|\W](?<handle>@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)/g;
     return parse_pattern(text, mention_regex, 'handle');
 }
+
 
 function parse_urls(text) {
     const url_regex = /[$|\W](?<url>https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@%_\+~#//=])?)/g;
@@ -1653,6 +1655,9 @@ function parse_urls(text) {
 
 
 async function resolveHandle(handle) {
+    // If the first character of the handle is '@', remove it.
+    handle = handle.startsWith('@') ? handle.substring(1) : handle;
+
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
         if (!response.ok) {
@@ -1664,6 +1669,7 @@ async function resolveHandle(handle) {
         return null;
     }
 }
+
 
 async function parse_facets(text) {
     let facets = [];

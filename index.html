@@ -807,12 +807,13 @@ input[type="text"]:focus {
 
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@1.0.13/dist/browser-image-compression.min.js"></script>
     <script>
-let debug = false; // Set to true when debugging
+let debug = true; // Set to true when debugging
 let requestsLog = [];
 
 // Correctly capture the '@' symbol and the subsequent handle.
 const mention_regex = /[$|\W](?<handle>@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)/g;
 const url_regex = /(?<url>(https?:\/\/)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*(?:[a-z0-9][a-z0-9-]{0,61}[a-z0-9]\.[a-z]{2,10})([\/\w.-]?[^,\s]*)?)/gi;
+const markdown_link_regex = /\[(?<title>[^\]]+)\]\((?<linkOrMention>[^\)]+)\)/g
 
 
 async function fetchWithLogging(url, options) {
@@ -1698,105 +1699,186 @@ async function resolveHandle(handle) {
 
 async function parse_facets(text) {
     let facets = [];
+    let parsedDetails = [];
+    let cleanedText = "";
+    let positionMappings = [];
+    let i = 0;
 
-    const mentionPromises = parse_mentions(text).map(async m => {
-        const didResponse = await resolveHandle(m.handle);
-        if (didResponse && didResponse.did) {
-            return {
-                index: {
-                    byteStart: m.start,
-                    byteEnd: m.end
-                },
-                features: [{
-                    "$type": "app.bsky.richtext.facet#mention",
-                    "did": didResponse.did
-                }]
-            };
+    while (i < text.length) {
+        if (text[i] === '[') {
+            let endBracket = text.indexOf(']', i);
+            let startParen = text.indexOf('(', endBracket);
+            let endParen = text.indexOf(')', startParen);
+
+            if (endBracket !== -1 && startParen !== -1 && endParen !== -1) {
+                const title = text.substring(i + 1, endBracket);
+                const linkOrMention = text.substring(startParen + 1, endParen);
+
+                cleanedText += title;
+                positionMappings.push({
+                    originalStart: i,
+                    originalEnd: endParen + 1,
+                    cleanedStart: cleanedText.length - title.length,
+                    cleanedEnd: cleanedText.length
+                });
+
+                if (linkOrMention.startsWith('@')) {  // Handle as mention
+                    const didResponse = await resolveHandle(linkOrMention);
+                    if (didResponse && didResponse.did) {
+                        parsedDetails.push({
+                            type: "mention",
+                            title: title,
+                            did: didResponse.did
+                        });
+                    }
+                } else {  // Handle as URL
+                    let url = linkOrMention;
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'http://' + url;
+                    }
+                    parsedDetails.push({
+                        type: "link",
+                        title: title,
+                        url: url
+                    });
+                }
+
+                i = endParen + 1;
+                continue;
+            }
         }
-        return null;
-    });
 
-    const resolvedMentions = await Promise.all(mentionPromises);
-    for (let mentionFacet of resolvedMentions) {
-        if (mentionFacet) facets.push(mentionFacet);
+        // Handle standalone mentions
+        if (text[i] === '@') {
+            let endOfMention = text.indexOf(' ', i);
+            if (endOfMention === -1) endOfMention = text.length;
+
+            const mention = text.substring(i, endOfMention);
+            const didResponse = await resolveHandle(mention);
+            if (didResponse && didResponse.did) {
+                cleanedText += mention;
+                positionMappings.push({
+                    originalStart: i,
+                    originalEnd: endOfMention,
+                    cleanedStart: cleanedText.length - mention.length,
+                    cleanedEnd: cleanedText.length
+                });
+                parsedDetails.push({
+                    type: "mention",
+                    title: mention,
+                    did: didResponse.did
+                });
+                i = endOfMention;
+                continue;
+            }
+        }
+
+        cleanedText += text[i];
+        i++;
     }
 
-    for (let u of parse_urls(text)) {
-        // Check if the URL starts with a known scheme
-        if (!u.url.startsWith('http://') && !u.url.startsWith('https://')) {
-            u.url = 'http://' + u.url; // Prepend with http://
-        }
-
-        facets.push({
-            index: {
-                byteStart: u.start,
-                byteEnd: u.end
-            },
-            features: [{
-                "$type": "app.bsky.richtext.facet#link",
-                "uri": u.url
-            }]
+    // After cleaning text, let's parse standalone URLs from cleanedText
+    let standaloneUrls = parse_urls(cleanedText);
+    for (let urlDetail of standaloneUrls) {
+        parsedDetails.push({
+            type: "link",
+            title: urlDetail.url,  // For standalone URLs, the title is the URL itself
+            url: urlDetail.url.startsWith('http://') || urlDetail.url.startsWith('https://') ? urlDetail.url : 'http://' + urlDetail.url
         });
     }
 
-    return facets;
+    for (let detail of parsedDetails) {
+        const mapping = positionMappings.find(m => m.cleanedStart <= cleanedText.indexOf(detail.title) && m.cleanedEnd >= cleanedText.indexOf(detail.title) + detail.title.length);
+        const byteStart = mapping ? getByteLength(cleanedText.substring(0, mapping.cleanedStart)) : getByteLength(cleanedText.substring(0, cleanedText.indexOf(detail.title)));
+        const byteEnd = byteStart + getByteLength(detail.title);
+
+        if (detail.type === "mention") {
+            facets.push({
+                index: {
+                    byteStart: byteStart,
+                    byteEnd: byteEnd
+                },
+                features: [{
+                    "$type": "app.bsky.richtext.facet#mention",
+                    "did": detail.did
+                }]
+            });
+        } else {
+            facets.push({
+                index: {
+                    byteStart: byteStart,
+                    byteEnd: byteEnd
+                },
+                features: [{
+                    "$type": "app.bsky.richtext.facet#link",
+                    "uri": detail.url
+                }]
+            });
+        }
+    }
+
+    return { facets, text: cleanedText };
 }
+
+
+
 
 
 
 
 async function postMessage(session, text, langs, embedImages, threadMetadata = {}) {
-    console.log('Attempting to post message...');
+console.log('Attempting to post message...');
     
-    const facetsResult = await parse_facets(text);
+const { facets, text: processedText } = await parse_facets(text);
     
-    let record = {
-        "$type": "app.bsky.feed.post",
-        "createdAt": new Date().toISOString(),
-        "text": text,
-        "langs": langs,
-        "facets": facetsResult,
-        ...threadMetadata  // Merge threadMetadata directly into record
+let record = {
+    "$type": "app.bsky.feed.post",
+    "createdAt": new Date().toISOString(),
+    "text": processedText, // Use the processed text
+    "langs": langs,
+    "facets": facets,
+    ...threadMetadata  // Merge threadMetadata directly into record
+};
+
+if (embedImages && embedImages.length > 0) {
+    record["embed"] = {
+        "$type": "app.bsky.embed.images",
+        "images": embedImages.map(img => ({
+            alt: img.alt,
+            image: {
+                "$type": "blob",
+                "ref": {
+                    "$link": img.image.blob.ref.$link
+                },
+                "mimeType": img.image.blob.mimeType,
+                "size": img.image.blob.size
+            }
+        }))
     };
-
-    if (embedImages && embedImages.length > 0) {
-        record["embed"] = {
-            "$type": "app.bsky.embed.images",
-            "images": embedImages.map(img => ({
-                alt: img.alt,
-                image: {
-                    "$type": "blob",
-                    "ref": {
-                        "$link": img.image.blob.ref.$link
-                    },
-                    "mimeType": img.image.blob.mimeType,
-                    "size": img.image.blob.size
-                }
-            }))
-        };
-    }
-
-    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
-        method: 'POST',
-        headers: {
-            ...JSON_HEADERS,
-            'Authorization': `Bearer ${session['accessJwt']}`
-        },
-        body: JSON.stringify({
-            repo: session['did'],
-            collection: 'app.bsky.feed.post',
-            record: record
-        })
-    });
-
-    if (!response.ok) {
-        const responseBody = await response.json();
-        console.error('Error response body:', responseBody);
-        throw new Error(`Failed to post message: ${response.statusText}`);
-    }
-
-    return response.json();
 }
+
+const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
+    method: 'POST',
+    headers: {
+        ...JSON_HEADERS,
+        'Authorization': `Bearer ${session['accessJwt']}`
+    },
+    body: JSON.stringify({
+        repo: session['did'],
+        collection: 'app.bsky.feed.post',
+        record: record
+    })
+});
+
+if (!response.ok) {
+    const responseBody = await response.json();
+    console.error('Error response body:', responseBody);
+    throw new Error(`Failed to post message: ${response.statusText}`);
+}
+
+return response.json();
+}
+
 
 
 function saveLogsToFile() {

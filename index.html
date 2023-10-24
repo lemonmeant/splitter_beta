@@ -1731,6 +1731,7 @@ function parse_urls(text) {
 
 
 async function resolveHandle(handle) {
+    await showLoginPopupIfNeeded();
     // If the first character of the handle is '@', remove it.
     handle = handle.startsWith('@') ? handle.substring(1) : handle;
 

@@ -1745,6 +1745,9 @@ async function resolveHandle(handle) {
         handle = handle.slice(0, -1);
     }
 
+    // Remove trailing CamelCase.
+    handle = handle.replace(/([a-z])([A-Z])+$/, '$1');
+
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
         if (!response.ok) {

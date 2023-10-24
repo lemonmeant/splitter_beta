@@ -1734,12 +1734,15 @@ async function resolveHandle(handle) {
     // If the first character of the handle is '@', remove it.
     handle = handle.startsWith('@') ? handle.substring(1) : handle;
 
-    // Remove any occurrence of '%' followed by any characters until a space or end of the string.
-    handle = handle.replace(/%[^ ]*/g, '');
+    // Remove all percent-encoded sequences.
+    handle = handle.replace(/%[0-9A-Fa-f]{2}/g, '');
 
-    // Remove any trailing non-alphanumeric characters.
-    while (handle.length > 0 && /[^a-zA-Z0-9]$/.test(handle)) {
-        handle = handle.substring(0, handle.length - 1);
+    // Remove all non-alphanumeric sequences, excluding the dot for domain names.
+    handle = handle.replace(/[^a-zA-Z0-9.]+/g, '');
+
+    // Trim off any trailing non-alphanumeric characters, including dots.
+    while (/[^a-zA-Z0-9]$/.test(handle)) {
+        handle = handle.slice(0, -1);
     }
 
     try {

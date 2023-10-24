@@ -1736,6 +1736,9 @@ async function resolveHandle(handle) {
     // If the first character of the handle is '@', remove it.
     handle = handle.startsWith('@') ? handle.substring(1) : handle;
 
+    // Remove any trailing '%##...' symbols from the handle.
+    handle = handle.replace(/%.*$/, '');
+
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
         if (!response.ok) {
@@ -1747,6 +1750,7 @@ async function resolveHandle(handle) {
         return null;
     }
 }
+
 
 
 async function parse_facets(text) {

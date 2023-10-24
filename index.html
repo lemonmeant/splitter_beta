@@ -1731,7 +1731,9 @@ function parse_urls(text) {
 
 
 async function resolveHandle(handle) {
-    await showLoginPopupIfNeeded();
+    handleMode = true;
+    
+    await showLoginPopupIfNeeded(handleMode);
     // If the first character of the handle is '@', remove it.
     handle = handle.startsWith('@') ? handle.substring(1) : handle;
 
@@ -2092,13 +2094,13 @@ async function loginAndStartThreadPosting() {
 
 
 
-async function showLoginPopupIfNeeded() {
+async function showLoginPopupIfNeeded(handleMode) {
     const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
 
-    if (obfuscatedCredentials) {
+    if (obfuscatedCredentials && !handleMode) { // Check if handleMode is false before posting thread
         const decryptedCredentials = deobfuscate(obfuscatedCredentials);
         postThread(JSON.parse(decryptedCredentials));
-    } else {
+    } else if (!obfuscatedCredentials) {  // Show login popup only if credentials are not available
         document.getElementById("loginPopup").style.display = "block";
     }
 }

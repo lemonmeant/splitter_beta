@@ -1405,7 +1405,7 @@ function renderSegmentWithFacets(segment, byteStart, byteEnd, facets) {
             if (facet.features[0]["$type"] === "app.bsky.richtext.facet#link") {
                 renderedText += `<a href="${facet.features[0].uri}" target="_blank" rel="noopener noreferrer">${facetText}</a>`;
             } else if (facet.features[0]["$type"] === "app.bsky.richtext.facet#mention") {
-                renderedText += `<a href="https://bsky.app/profile/${facet.features[0].did} target="_blank" rel="noopener noreferrer">${facetText}</a>`;
+                renderedText += `<a href="https://bsky.app/profile/${facet.features[0].did}" target="_blank" rel="noopener noreferrer">${facetText}</a>`;
             }
 
             currentBytePos = facet.index.byteEnd;

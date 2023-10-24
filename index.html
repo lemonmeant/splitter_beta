@@ -1737,7 +1737,7 @@ async function resolveHandle(handle) {
     // Remove all percent-encoded sequences.
     handle = handle.replace(/%[0-9A-Fa-f]{2}/g, '');
 
-    // Remove all non-alphanumeric sequences, excluding the dot for domain names.
+    // Remove all non-alphanumeric characters, excluding the dot.
     handle = handle.replace(/[^a-zA-Z0-9.]+/g, '');
 
     // Trim off any trailing non-alphanumeric characters, including dots.
@@ -1746,7 +1746,10 @@ async function resolveHandle(handle) {
     }
 
     // Remove trailing CamelCase.
-    handle = handle.replace(/([a-z])([A-Z])+$/, '$1');
+    const camelCasePattern = /[a-z][A-Z]+$/;
+    while (camelCasePattern.test(handle)) {
+        handle = handle.replace(camelCasePattern, '');
+    }
 
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
@@ -1759,6 +1762,7 @@ async function resolveHandle(handle) {
         return null;
     }
 }
+
 
 
 async function parse_facets(text) {

@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -1736,8 +1734,13 @@ async function resolveHandle(handle) {
     // If the first character of the handle is '@', remove it.
     handle = handle.startsWith('@') ? handle.substring(1) : handle;
 
-    // Remove any trailing '%##...' symbols from the handle.
-    handle = handle.replace(/%.*$/, '');
+    // Remove any occurrence of '%' followed by any characters until a space or end of the string.
+    handle = handle.replace(/%[^ ]*/g, '');
+
+    // Remove any trailing non-alphanumeric characters.
+    while (handle.length > 0 && /[^a-zA-Z0-9]$/.test(handle)) {
+        handle = handle.substring(0, handle.length - 1);
+    }
 
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
@@ -1750,7 +1753,6 @@ async function resolveHandle(handle) {
         return null;
     }
 }
-
 
 
 async function parse_facets(text) {

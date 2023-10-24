@@ -1730,7 +1730,13 @@ function parse_urls(text) {
 }
 
 
-function cleanHandle(handle) {
+async function resolveHandle(handle) {
+    handleMode = true;
+    
+    await showLoginPopupIfNeeded(handleMode);
+    // If the first character of the handle is '@', remove it.
+    handle = handle.startsWith('@') ? handle.substring(1) : handle;
+
     // Remove all percent-encoded sequences.
     handle = handle.replace(/%[0-9A-Fa-f]{2}/g, '');
 
@@ -1747,16 +1753,6 @@ function cleanHandle(handle) {
     while (camelCasePattern.test(handle)) {
         handle = handle.replace(camelCasePattern, '');
     }
-    
-    return handle;
-}
-        
-async function resolveHandle(handle) {
-    // If the first character of the handle is '@', remove it.
-    handle = handle.startsWith('@') ? handle.substring(1) : handle;
-
-    // Clean up the handle as per the rules you provided.
-    handle = cleanHandle(handle);
 
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
@@ -2098,10 +2094,10 @@ async function loginAndStartThreadPosting() {
 
 
 
-async function showLoginPopupIfNeeded() {
+async function showLoginPopupIfNeeded(handleMode) {
     const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
 
-    if (obfuscatedCredentials) {
+    if (obfuscatedCredentials && !handleMode) { // Check if handleMode is false before posting thread
         const decryptedCredentials = deobfuscate(obfuscatedCredentials);
         postThread(JSON.parse(decryptedCredentials));
     } else if (!obfuscatedCredentials) {  // Show login popup only if credentials are not available

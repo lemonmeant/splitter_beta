@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -1294,21 +1296,18 @@ function handleAddPic(button, skeetDiv) {
 
 
 
-async function segmentText() {
-    let cleanedText = inputText.value.replace(/ +/g, ' ')
-                                     .replace(/\n{3,}/g, '\n\n')
-                                     .replace(/([\(\[\{])\s+/g, '$1')
-                                     .replace(/\s+([\)\]\}])/g, '$1')
-                                     .trim();
-                                     
-    const {text: processedText } = await parse_facets(cleanedText);
+function segmentText() {
+let cleanedText = inputText.value.replace(/ +/g, ' ')
+                                 .replace(/\n{3,}/g, '\n\n') // Collapse 3 or more newlines to two
+                                 .replace(/([\(\[\{])\s+/g, '$1')
+                                 .replace(/\s+([\)\]\}])/g, '$1')
+                                 .trim();
+
+
+    let parts = cleanedText.split("##").map(part => part.trim()); // Added .map() to trim each part
     
-    cleanedText = processedText;
-    let parts = cleanedText.split("##").map(part => part.trim());
-
     let allSegments = [];
-    let currentBytePos = 0;
-
+    
     for (let part of parts) {
         let segments = [];
         let currentIndex = 0;
@@ -1323,21 +1322,17 @@ async function segmentText() {
             }
             
             if (segment) {
-                allSegments.push({
-                    segment: segment,
-                    byteStart: currentBytePos,
-                    byteEnd: currentBytePos + getByteLength(segment)
-                });
-                currentBytePos += getByteLength(segment);
+                segments.push(segment);
             }
 
             currentIndex += segmentEnd;
         }
+        
+        allSegments = allSegments.concat(segments);
     }
 
     renderSegments(allSegments);
 }
-
 
 
 const excludeCounterCheckbox = document.getElementById('excludeCounterCheckbox');
@@ -1392,41 +1387,8 @@ function similarityScore(str1, str2) {
     return Math.min(score, 1); // Ensure the score remains between 0 and 1
 }
 
-function renderSegmentWithFacets(segment, byteStart, byteEnd, facets) {
-    let renderedText = '';
-    let currentBytePos = byteStart;
-    let currentIndex = 0;
 
-    while (currentIndex < segment.length) {
-        const facet = facets.find(f => currentBytePos >= f.index.byteStart && currentBytePos < f.index.byteEnd);
-
-        if (facet) {
-            const facetText = segment.substring(currentIndex, currentIndex + (facet.index.byteEnd - currentBytePos));
-            if (facet.features[0]["$type"] === "app.bsky.richtext.facet#link") {
-                renderedText += `<a href="${facet.features[0].uri}" target="_blank" rel="noopener noreferrer">${facetText}</a>`;
-            } else if (facet.features[0]["$type"] === "app.bsky.richtext.facet#mention") {
-                renderedText += `<a href="https://bsky.app/profile/${facet.features[0].did}" target="_blank" rel="noopener noreferrer">${facetText}</a>`;
-            }
-
-            currentBytePos = facet.index.byteEnd;
-            currentIndex += facetText.length;
-        } else {
-            renderedText += segment[currentIndex];
-            currentBytePos += new Blob([segment[currentIndex]]).size;
-            currentIndex++;
-        }
-    }
-
-    return renderedText;
-}
-
-function renderSegmentWithoutFacets(segment) {
-    return segment; // This function simply returns the segment as it is, without any facet rendering.
-}
-
-
-
-async function renderSegments(segments) {
+function renderSegments(segments) {
     const currentContent = document.querySelector('textarea').value;
     const currentThreadIndicatorSymbol = threadIndicatorSymbol;
     const currentExcludeCounterState = document.getElementById('excludeCounterCheckbox').checked;
@@ -1436,8 +1398,6 @@ async function renderSegments(segments) {
         lastExcludeCounterState === currentExcludeCounterState) {
         return;
     }
-
-    const { facets } = await parse_facets(currentContent);
 
     let backupSkeetImagesMap = new Map([...skeetImagesMap.entries()]);
     let oldSkeetContents = Array.from(skeetsDisplay.children);
@@ -1450,10 +1410,6 @@ async function renderSegments(segments) {
     skeetsDisplay.innerHTML = '';
 
     segments.forEach((seg, index) => {
-        const segmentFacets = facets.filter(f => f.index.byteStart >= seg.byteStart && f.index.byteEnd <= seg.byteEnd);
-        const renderedSegmentForUser = renderSegmentWithFacets(seg.segment, seg.byteStart, seg.byteEnd, segmentFacets);
-        const facetlessSegment = renderSegmentWithoutFacets(seg.segment);
-
         let excludeCounter = !document.getElementById('excludeCounterCheckbox').checked;
         let threadIndicator = excludeCounter
             ? (threadIndicatorSymbol ? `${threadIndicatorSymbol} ` : "")
@@ -1469,8 +1425,7 @@ async function renderSegments(segments) {
 
         let skeetContentDiv = document.createElement('div');
         skeetContentDiv.classList.add('skeet-content');
-        skeetContentDiv.innerHTML = `${threadIndicator.replace('\n', '<br>')}${renderedSegmentForUser.replace(/\n/g, "<br>")}`;
-        skeetContentDiv.setAttribute('data-facetless', `${threadIndicator}${facetlessSegment}`);
+        skeetContentDiv.innerHTML = `${threadIndicator.replace('\n', '<br>')}${seg.replace(/\n/g, "<br>")}`;
         skeetInnerDiv.appendChild(skeetContentDiv);
 
         let thumbnailContainer = document.createElement('div');
@@ -1483,8 +1438,8 @@ async function renderSegments(segments) {
         let bestMatchID = null;
 
         for (let oldSkeetDiv of oldSkeetContents) {
-            let oldContent = oldSkeetDiv.querySelector('.skeet-content').getAttribute('data-facetless');
-            let score = similarityScore(oldContent, facetlessSegment);
+            let oldContent = oldSkeetDiv.querySelector('.skeet-content').textContent;
+            let score = similarityScore(oldContent, seg);
             if (score > bestMatchScore) {
                 bestMatchScore = score;
                 bestMatchID = oldSkeetDiv.id;
@@ -1542,7 +1497,7 @@ async function renderSegments(segments) {
         let copyButton = document.createElement('button');
         copyButton.innerText = 'Copy';
         copyButton.classList.add('copy');
-        let copyContent = skeetContentDiv.getAttribute('data-facetless');
+        let copyContent = threadIndicator + seg;
         copyButton.onclick = function() {
             copyToClipboard(copyContent, this);
         };
@@ -1564,7 +1519,7 @@ async function renderSegments(segments) {
         skeetsDisplay.appendChild(skeetDiv);
         setTimeout(() => {
             skeetDiv.style.opacity = '1';
-        }, 0);
+        }, 100 * index);
     });
 }
 
@@ -1572,17 +1527,12 @@ async function renderSegments(segments) {
 
 
 
-let counterMode = false;  // Set to true when in counter mode
-
-inputText.addEventListener('input', async () => {
-    counterMode = true;  // Enable counter mode
-    const result = await parse_facets(inputText.value);
-    charCount.innerText = `${result.textLength} characters`;
-    counterMode = false;  // Reset counter mode after getting the count
+inputText.addEventListener('input', () => {
+    charCount.innerText = `${inputText.value.length} characters`;
 });
 
-
 inputText.addEventListener('input', () => {
+    charCount.innerText = `${inputText.value.length} characters`;
     localStorage.setItem('savedText', inputText.value); // Save the current input text
 });
 
@@ -1731,34 +1681,8 @@ function parse_urls(text) {
 
 
 async function resolveHandle(handle) {
-    
-    if (obfuscatedCredentials) {
-        
-        const decryptedCredentials = deobfuscate(obfuscatedCredentials);
-        
-    } else if (!obfuscatedCredentials) {  // Show login popup only if credentials are not available
-        document.getElementById("loginPopup").style.display = "block";
-    }
-    
     // If the first character of the handle is '@', remove it.
     handle = handle.startsWith('@') ? handle.substring(1) : handle;
-
-    // Remove all percent-encoded sequences.
-    handle = handle.replace(/%[0-9A-Fa-f]{2}/g, '');
-
-    // Remove all non-alphanumeric characters, excluding the dot.
-    handle = handle.replace(/[^a-zA-Z0-9.]+/g, '');
-
-    // Trim off any trailing non-alphanumeric characters, including dots.
-    while (/[^a-zA-Z0-9]$/.test(handle)) {
-        handle = handle.slice(0, -1);
-    }
-
-    // Remove trailing CamelCase.
-    const camelCasePattern = /[a-z][A-Z]+$/;
-    while (camelCasePattern.test(handle)) {
-        handle = handle.replace(camelCasePattern, '');
-    }
 
     try {
         let response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
@@ -1771,7 +1695,6 @@ async function resolveHandle(handle) {
         return null;
     }
 }
-
 
 
 async function parse_facets(text) {
@@ -1789,37 +1712,35 @@ async function parse_facets(text) {
 
             if (endBracket !== -1 && startParen !== -1 && endParen !== -1) {
                 const title = text.substring(i + 1, endBracket);
+                const linkOrMention = text.substring(startParen + 1, endParen);
+
                 cleanedText += title;
+                positionMappings.push({
+                    originalStart: i,
+                    originalEnd: endParen + 1,
+                    cleanedStart: cleanedText.length - title.length,
+                    cleanedEnd: cleanedText.length
+                });
 
-                if (!counterMode) {
-                    const linkOrMention = text.substring(startParen + 1, endParen);
-                    positionMappings.push({
-                        originalStart: i,
-                        originalEnd: endParen + 1,
-                        cleanedStart: cleanedText.length - title.length,
-                        cleanedEnd: cleanedText.length
-                    });
-
-                    if (linkOrMention.startsWith('@')) {
-                        const didResponse = await resolveHandle(linkOrMention);
-                        if (didResponse && didResponse.did) {
-                            parsedDetails.push({
-                                type: "mention",
-                                title: title,
-                                did: didResponse.did
-                            });
-                        }
-                    } else {
-                        let url = linkOrMention;
-                        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                            url = 'http://' + url;
-                        }
+                if (linkOrMention.startsWith('@')) {  // Handle as mention
+                    const didResponse = await resolveHandle(linkOrMention);
+                    if (didResponse && didResponse.did) {
                         parsedDetails.push({
-                            type: "link",
+                            type: "mention",
                             title: title,
-                            url: url
+                            did: didResponse.did
                         });
                     }
+                } else {  // Handle as URL
+                    let url = linkOrMention;
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'http://' + url;
+                    }
+                    parsedDetails.push({
+                        type: "link",
+                        title: title,
+                        url: url
+                    });
                 }
 
                 i = endParen + 1;
@@ -1827,7 +1748,8 @@ async function parse_facets(text) {
             }
         }
 
-        if (text[i] === '@' && !counterMode) {
+        // Handle standalone mentions
+        if (text[i] === '@') {
             let endOfMention = text.indexOf(' ', i);
             if (endOfMention === -1) endOfMention = text.length;
 
@@ -1855,50 +1777,48 @@ async function parse_facets(text) {
         i++;
     }
 
-    if (!counterMode) {
-        let standaloneUrls = parse_urls(cleanedText);
-        for (let urlDetail of standaloneUrls) {
-            parsedDetails.push({
-                type: "link",
-                title: urlDetail.url,
-                url: urlDetail.url.startsWith('http://') || urlDetail.url.startsWith('https://') ? urlDetail.url : 'http://' + urlDetail.url
+    // After cleaning text, let's parse standalone URLs from cleanedText
+    let standaloneUrls = parse_urls(cleanedText);
+    for (let urlDetail of standaloneUrls) {
+        parsedDetails.push({
+            type: "link",
+            title: urlDetail.url,  // For standalone URLs, the title is the URL itself
+            url: urlDetail.url.startsWith('http://') || urlDetail.url.startsWith('https://') ? urlDetail.url : 'http://' + urlDetail.url
+        });
+    }
+
+    for (let detail of parsedDetails) {
+        const mapping = positionMappings.find(m => m.cleanedStart <= cleanedText.indexOf(detail.title) && m.cleanedEnd >= cleanedText.indexOf(detail.title) + detail.title.length);
+        const byteStart = mapping ? getByteLength(cleanedText.substring(0, mapping.cleanedStart)) : getByteLength(cleanedText.substring(0, cleanedText.indexOf(detail.title)));
+        const byteEnd = byteStart + getByteLength(detail.title);
+
+        if (detail.type === "mention") {
+            facets.push({
+                index: {
+                    byteStart: byteStart,
+                    byteEnd: byteEnd
+                },
+                features: [{
+                    "$type": "app.bsky.richtext.facet#mention",
+                    "did": detail.did
+                }]
             });
-        }
-
-        for (let detail of parsedDetails) {
-            const mapping = positionMappings.find(m => m.cleanedStart <= cleanedText.indexOf(detail.title) && m.cleanedEnd >= cleanedText.indexOf(detail.title) + detail.title.length);
-            const byteStart = mapping ? getByteLength(cleanedText.substring(0, mapping.cleanedStart)) : getByteLength(cleanedText.substring(0, cleanedText.indexOf(detail.title)));
-            const byteEnd = byteStart + getByteLength(detail.title);
-
-            if (detail.type === "mention") {
-                facets.push({
-                    index: {
-                        byteStart: byteStart,
-                        byteEnd: byteEnd
-                    },
-                    features: [{
-                        "$type": "app.bsky.richtext.facet#mention",
-                        "did": detail.did
-                    }]
-                });
-            } else {
-                facets.push({
-                    index: {
-                        byteStart: byteStart,
-                        byteEnd: byteEnd
-                    },
-                    features: [{
-                        "$type": "app.bsky.richtext.facet#link",
-                        "uri": detail.url
-                    }]
-                });
-            }
+        } else {
+            facets.push({
+                index: {
+                    byteStart: byteStart,
+                    byteEnd: byteEnd
+                },
+                features: [{
+                    "$type": "app.bsky.richtext.facet#link",
+                    "uri": detail.url
+                }]
+            });
         }
     }
 
-    return { facets, text: cleanedText, textLength: cleanedText.length };
+    return { facets, text: cleanedText };
 }
-
 
 
 
@@ -2007,8 +1927,7 @@ async function postThread(credentials) {
         let previousPostMetadata = null;
 
         for (const skeet of skeets) {
-            // Use the data-facetless attribute to get the facetless version of the content
-            let text = skeet.getAttribute('data-facetless');
+            let text = skeet.innerHTML.replace(/<br>/g, '\n').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
             let skeetID = skeet.parentElement.parentElement.id;  
             const images = skeetImagesMap.get(skeetID) || [];
@@ -2075,7 +1994,6 @@ async function postThread(credentials) {
 
 
 
-
 async function loginAndStartThreadPosting() {
     const handle = document.getElementById('handle').value.trim();
     const appPassword = document.getElementById('appPassword').value.trim();
@@ -2106,7 +2024,7 @@ async function showLoginPopupIfNeeded() {
     if (obfuscatedCredentials) {
         const decryptedCredentials = deobfuscate(obfuscatedCredentials);
         postThread(JSON.parse(decryptedCredentials));
-    } else if (!obfuscatedCredentials) {  // Show login popup only if credentials are not available
+    } else {
         document.getElementById("loginPopup").style.display = "block";
     }
 }

@@ -2094,7 +2094,7 @@ async function loginAndStartThreadPosting() {
 
 
 
-async function showLoginPopupIfNeeded(handleMode) {
+async function showLoginPopupIfNeeded(handleMode = false) {
     const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
 
     if (obfuscatedCredentials && !handleMode) { // Check if handleMode is false before posting thread

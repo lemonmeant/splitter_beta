@@ -830,6 +830,7 @@ const DEFAULT_EXPIRATION_TIME = 2 * DAY_IN_MILLISECONDS; // 2 days
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
 const originalGetItem = localStorage.getItem.bind(localStorage);
+let shouldStartThreadAfterLogin = true;
 
 localStorage.setItem = function(key, value) {
     const timestampKey = key + "-timestamp";
@@ -1778,11 +1779,15 @@ function parse_urls(text) {
 const handleCache = new Map();
 
 async function resolveHandle(handle) {
+    // Store the initial value
+    const initialShouldStartThreadAfterLogin = shouldStartThreadAfterLogin;
+
     const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
     
     if (obfuscatedCredentials) {
-       
+        
     } else {
+        shouldStartThreadAfterLogin = false;
         document.getElementById("loginPopup").style.display = "block";
     }
 
@@ -1810,6 +1815,9 @@ async function resolveHandle(handle) {
     } catch (error) {
         console.error('Error in resolveHandle:', error);
         return null;
+    } finally {
+        // Reset the value back to its initial state before function exit
+        shouldStartThreadAfterLogin = initialShouldStartThreadAfterLogin;
     }
 }
 
@@ -2192,7 +2200,10 @@ async function loginAndStartThreadPosting() {
     
     closeLoginPopup();
     displayLogoutLink();
-    postThread({ handle, appPassword });
+
+    if (shouldStartThreadAfterLogin) {
+        postThread({ handle, appPassword });
+    }
 }
 
 

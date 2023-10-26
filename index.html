@@ -1736,9 +1736,15 @@ async function askForAltText(imageSrc, currentAlt = '') {
 }
 
 function getByteLength(str) {
-    let modifiedStr = str.replace(/ +/g, ' ').replace(/\s*##\s*/g, '');
-    return new Blob([modifiedStr]).size;
+    let cleanedStr = str.replace(/ +/g, ' ')
+                        .replace(/\n{3,}/g, '\n\n')
+                        .replace(/([\(\[\{])\s+/g, '$1')
+                        .replace(/\s+([\)\]\}])/g, '$1')
+                        .replace(/\s*##\s*/g, '');
+
+    return new Blob([cleanedStr]).size;
 }
+
 
 
 

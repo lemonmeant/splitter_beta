@@ -812,9 +812,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
     inputText.addEventListener('input', function() {
         let text = inputText.value;
         text = text.replace(/ +/g, ' ') // Replace multiple spaces with a single space
-                   .replace(/\n{3,}/g, '\n\n') // Replace three or more newlines with two
-                   .replace(/([\(\[\{])\s+/g, '$1') // Remove spaces after opening brackets
-                   .replace(/\s+([\)\]\}])/g, '$1');  // Remove spaces before closing brackets
+                   .replace(/\n{3,}/g, '\n\n');
 
         inputText.value = text;
     });
@@ -1308,44 +1306,59 @@ function handleAddPic(button, skeetDiv) {
 
 
 async function segmentText() {
-    let cleanedText = inputText.value;
-                                     
-    const {text: processedText } = await parse_facets(cleanedText);
-    
-    cleanedText = processedText;
-    let parts = cleanedText.split("##").map(part => part.trim());
-
+    let inputTextValue = inputText.value;
+    let metasegments = inputTextValue.split("##");
     let allSegments = [];
     let currentBytePos = 0;
 
-    for (let part of parts) {
-        let segments = [];
-        let currentIndex = 0;
+    for (let metasegmentIndex = 0; metasegmentIndex < metasegments.length; metasegmentIndex++) {
+        // Trim the start of the metasegment
+        let metasegment = metasegments[metasegmentIndex].trimStart();
+        const trimmedLength = getByteLength(metasegments[metasegmentIndex]) - getByteLength(metasegment);
         
-        while (currentIndex < part.length) {
-            let segmentEnd = getSegmentEnd(part.slice(currentIndex, currentIndex + INPUT_MAX_LENGTH - BUFFER), INPUT_MAX_LENGTH - BUFFER);
-            let segment = part.slice(currentIndex, currentIndex + segmentEnd);
+        // Apply the byte position adjustment for the trimmed part
+        currentBytePos += trimmedLength;
+
+        // Process each metasegment individually
+        const { text: processedText, facets } = await parse_facets(metasegment);
+
+        // Adjust for the "##" delimiter in all but the first metasegment
+        if (metasegmentIndex > 0) {
+            currentBytePos += getByteLength("##");
+        }
+
+        let currentIndex = 0;
+        while (currentIndex < processedText.length) {
+            // Calculate the end of the segment, taking multibyte characters into account
+            let segmentEnd = getSegmentEnd(processedText.slice(currentIndex, currentIndex + INPUT_MAX_LENGTH - BUFFER), INPUT_MAX_LENGTH - BUFFER);
+            let segment = processedText.slice(currentIndex, currentIndex + segmentEnd);
             
             if (!segmentEnd || !segment) {
                 alert('Unable to segment the text properly. Please check the input.');
                 break;
             }
             
-            if (segment) {
-                allSegments.push({
-                    segment: segment,
-                    byteStart: currentBytePos,
-                    byteEnd: currentBytePos + getByteLength(segment)
-                });
-                currentBytePos += getByteLength(segment);
-            }
+            // Calculate the byte length of the segment
+            let segmentByteLength = getByteLength(segment);
+            allSegments.push({
+                segment: segment,
+                byteStart: currentBytePos,
+                byteEnd: currentBytePos + segmentByteLength,
+                // Additional data for each segment, e.g., facets relevant to this segment
+            });
 
+            // Update the current byte position for the start of the next segment
+            currentBytePos += segmentByteLength;
+
+            // Move to the next segment
             currentIndex += segmentEnd;
         }
     }
 
     renderSegments(allSegments);
 }
+
+
 
 
 
@@ -1744,9 +1757,8 @@ async function askForAltText(imageSrc, currentAlt = '') {
 }
 
 function getByteLength(str) {
-    let Str = str;
 
-    return new Blob([Str]).size;
+    return new TextEncoder().encode(str).length;
 }
 
 
@@ -2021,12 +2033,6 @@ async function parse_facets(text, counterMode = false) {
 
     return { facets, text: cleanedText, textLength: cleanedText.length };
 }
-
-
-
-
-
-
 
 
 

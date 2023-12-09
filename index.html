@@ -760,7 +760,7 @@ input[type="text"]:focus {
 </div>
     <textarea id="inputText" placeholder="Type your long post here. To divide it into separate sections, insert ## between the parts you want to split."></textarea>
     <div style="text-align:center; margin-top:10px; color: green; font-weight: bold;">
-        Beta Test. Try [Unlimited Markdown](titl.es or @mentio.ns)
+        Try [Unlimited Markdown](http(s)://titl.es or @mentio.ns)
     </div>
     <p id="charCount">0 characters</p>
     <button id="segmentButton" data-tooltip="Click to segment your message into thread">Segment</button>
@@ -804,6 +804,8 @@ input[type="text"]:focus {
     <div id="skeetsDisplay"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@1.0.13/dist/browser-image-compression.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/grapheme-splitter@1.0.4/index.min.js"></script>
+
     <script>
     
 document.addEventListener('DOMContentLoaded', (event) => {
@@ -1417,13 +1419,36 @@ function similarityScore(str1, str2) {
 function renderSegmentWithFacets(segment, byteStart, byteEnd, facets) {
     let renderedText = '';
     let currentBytePos = byteStart;
+    let graphemeSplitter = new GraphemeSplitter();
+    let graphemes = graphemeSplitter.splitGraphemes(segment);
+    let byteSizes = graphemes.map(char => getByteSize(char));
     let currentIndex = 0;
 
-    while (currentIndex < segment.length) {
+    function getByteSize(str) {
+        return new TextEncoder().encode(str).length;
+    }
+
+    while (currentIndex < graphemes.length) {
         const facet = facets.find(f => currentBytePos >= f.index.byteStart && currentBytePos < f.index.byteEnd);
 
         if (facet) {
-            const facetText = segment.substring(currentIndex, currentIndex + (facet.index.byteEnd - currentBytePos));
+            const facetLength = facet.index.byteEnd - currentBytePos;
+            let facetText = '';
+            let accumulatedByteSize = 0;
+
+            while (accumulatedByteSize < facetLength && currentIndex < graphemes.length) {
+                const currentChar = graphemes[currentIndex];
+                const currentCharSize = byteSizes[currentIndex];
+                
+                if (accumulatedByteSize + currentCharSize <= facetLength) {
+                    facetText += currentChar;
+                    accumulatedByteSize += currentCharSize;
+                    currentIndex++;
+                } else {
+                    break;
+                }
+            }
+
             if (facet.features[0]["$type"] === "app.bsky.richtext.facet#link") {
                 renderedText += `<a href="${facet.features[0].uri}" target="_blank" rel="noopener noreferrer">${facetText}</a>`;
             } else if (facet.features[0]["$type"] === "app.bsky.richtext.facet#mention") {
@@ -1431,10 +1456,9 @@ function renderSegmentWithFacets(segment, byteStart, byteEnd, facets) {
             }
 
             currentBytePos = facet.index.byteEnd;
-            currentIndex += facetText.length;
         } else {
-            renderedText += segment[currentIndex];
-            currentBytePos += new Blob([segment[currentIndex]]).size;
+            renderedText += graphemes[currentIndex];
+            currentBytePos += byteSizes[currentIndex];
             currentIndex++;
         }
     }
@@ -1442,21 +1466,45 @@ function renderSegmentWithFacets(segment, byteStart, byteEnd, facets) {
     return renderedText;
 }
 
+
+
 function recreateOriginalMarkdown(segment, byteStart, byteEnd, facets) {
     let originalText = '';
     let currentBytePos = byteStart;
+    let graphemeSplitter = new GraphemeSplitter();
+    let graphemes = graphemeSplitter.splitGraphemes(segment);
+    let byteSizes = graphemes.map(char => getByteSize(char));
     let currentIndex = 0;
 
     function normalizeUrl(url) {
         return url.replace(/^https?:\/\//, '');  // Remove 'http://' or 'https://' prefix
     }
 
-    while (currentIndex < segment.length) {
+    function getByteSize(str) {
+        return new TextEncoder().encode(str).length;
+    }
+
+    while (currentIndex < graphemes.length) {
         const facet = facets.find(f => currentBytePos >= f.index.byteStart && currentBytePos < f.index.byteEnd);
 
         if (facet) {
-            const facetText = segment.substring(currentIndex, currentIndex + (facet.index.byteEnd - currentBytePos));
-            
+            const facetLength = facet.index.byteEnd - currentBytePos;
+            let facetText = '';
+            let accumulatedByteSize = 0;
+
+            while (accumulatedByteSize < facetLength && currentIndex < graphemes.length) {
+                const currentChar = graphemes[currentIndex];
+                const currentCharSize = byteSizes[currentIndex];
+                
+                if (accumulatedByteSize + currentCharSize <= facetLength) {
+                    facetText += currentChar;
+                    accumulatedByteSize += currentCharSize;
+                    currentIndex++;
+                } else {
+                    break;
+                }
+            }
+
             if (facet.features[0]["$type"] === "app.bsky.richtext.facet#link") {
                 if (normalizeUrl(facetText) === normalizeUrl(facet.features[0].uri)) {
                     originalText += facetText;
@@ -1473,16 +1521,19 @@ function recreateOriginalMarkdown(segment, byteStart, byteEnd, facets) {
             }
 
             currentBytePos = facet.index.byteEnd;
-            currentIndex += facetText.length;
         } else {
-            originalText += segment[currentIndex];
-            currentBytePos += new Blob([segment[currentIndex]]).size;
+            originalText += graphemes[currentIndex];
+            currentBytePos += byteSizes[currentIndex];
             currentIndex++;
         }
     }
 
     return originalText;
 }
+
+
+
+
 
 
 
@@ -1903,19 +1954,25 @@ async function parse_facets(text, counterMode = false) {
     let facets = [];
     let positionMappings = [];
     let cleanedText = "";
+    let graphemeSplitter = new GraphemeSplitter();
+    let graphemes = graphemeSplitter.splitGraphemes(text);
     let i = 0;
 
-    while (i < text.length) {
+    function getByteLength(str) {
+        return new TextEncoder().encode(str).length;
+    }
+
+    while (i < graphemes.length) {
         try {
             // Handle Markdown links and possible mentions within them
-            if (text[i] === '[') {
-                let endBracket = text.indexOf(']', i);
-                let startParen = text.indexOf('(', endBracket);
-                let endParen = text.indexOf(')', startParen);
+            if (graphemes[i] === '[') {
+                let endBracketIndex = graphemes.indexOf(']', i);
+                let startParenIndex = graphemes.indexOf('(', endBracketIndex);
+                let endParenIndex = graphemes.indexOf(')', startParenIndex);
 
-                if (endBracket > i && startParen > endBracket && endParen > startParen) {
-                    const title = text.substring(i + 1, endBracket);
-                    let urlOrMention = text.substring(startParen + 1, endParen);
+                if (endBracketIndex > i && startParenIndex > endBracketIndex && endParenIndex > startParenIndex) {
+                    const title = graphemes.slice(i + 1, endBracketIndex).join('');
+                    let urlOrMention = graphemes.slice(startParenIndex + 1, endParenIndex).join('');
 
                     // Check if it's a mention in the Markdown link
                     if (urlOrMention.startsWith('@')) {
@@ -1926,7 +1983,7 @@ async function parse_facets(text, counterMode = false) {
                                 url: didResponse.did,
                                 isMention: true,
                                 originalStart: i,
-                                originalEnd: endParen + 1,
+                                originalEnd: endParenIndex + 1,
                                 cleanedStart: cleanedText.length,
                                 cleanedEnd: cleanedText.length + title.length
                             });
@@ -1941,25 +1998,25 @@ async function parse_facets(text, counterMode = false) {
                             url: urlOrMention,
                             isMention: false,
                             originalStart: i,
-                            originalEnd: endParen + 1,
+                            originalEnd: endParenIndex + 1,
                             cleanedStart: cleanedText.length,
                             cleanedEnd: cleanedText.length + title.length
                         });
                     }
                     cleanedText += title;
-                    i = endParen + 1;
+                    i = endParenIndex + 1;
                     continue;
                 }
             }
 
             // Handle standalone mentions
-            if (text[i] === '@') {
-                let endOfMention = text.indexOf(' ', i);
-                if (endOfMention === -1) {
-                    endOfMention = text.length;
+            if (graphemes[i] === '@') {
+                let endOfMentionIndex = graphemes.indexOf(' ', i);
+                if (endOfMentionIndex === -1) {
+                    endOfMentionIndex = graphemes.length;
                 }
 
-                const mention = text.substring(i, endOfMention);
+                const mention = graphemes.slice(i, endOfMentionIndex).join('');
                 const didResponse = await resolveHandle(mention);
                 if (didResponse && didResponse.did) {
                     cleanedText += mention;
@@ -1968,17 +2025,17 @@ async function parse_facets(text, counterMode = false) {
                         url: didResponse.did,
                         isMention: true,
                         originalStart: i,
-                        originalEnd: endOfMention,
+                        originalEnd: endOfMentionIndex,
                         cleanedStart: cleanedText.length - mention.length,
                         cleanedEnd: cleanedText.length
                     });
                 }
 
-                i = endOfMention;
+                i = endOfMentionIndex;
                 continue;
             }
 
-            cleanedText += text[i];
+            cleanedText += graphemes[i];
             i++;
         } catch (error) {
             console.error("An error occurred during parsing:", error);
@@ -1987,7 +2044,7 @@ async function parse_facets(text, counterMode = false) {
     }
 
     if (!counterMode) {
-        let standaloneUrls = parse_urls(cleanedText);
+        let standaloneUrls = parse_urls(cleanedText); // Ensure parse_urls can handle graphemes
         for (let urlDetail of standaloneUrls) {
             let urlPosition = cleanedText.indexOf(urlDetail.url);
             while (urlPosition !== -1) {
@@ -2031,8 +2088,9 @@ async function parse_facets(text, counterMode = false) {
         }
     }
 
-    return { facets, text: cleanedText, textLength: cleanedText.length };
+    return { facets, text: cleanedText, textLength: graphemes.length };
 }
+
 
 
 

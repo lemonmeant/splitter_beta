@@ -1970,6 +1970,10 @@ async function parse_facets(text, counterMode = false) {
     let graphemes = graphemeSplitter.splitGraphemes(text);
     let i = 0;
 
+    function getByteLength(str) {
+        return new TextEncoder().encode(str).length;
+    }
+
     while (i < graphemes.length) {
         try {
             // Handle Markdown links and possible mentions within them
@@ -1982,7 +1986,8 @@ async function parse_facets(text, counterMode = false) {
                     const title = graphemes.slice(i + 1, endBracketIndex).join('');
                     let urlOrMention = graphemes.slice(startParenIndex + 1, endParenIndex).join('');
 
-                    if (urlOrMention.startsWith('@') && urlOrMention.includes('.') && !counterMode) {
+                    // Check if it's a mention in the Markdown link
+                    if (urlOrMention.startsWith('@')) {
                         const didResponse = await resolveHandle(urlOrMention);
                         if (didResponse && didResponse.did) {
                             positionMappings.push({
@@ -1996,20 +2001,19 @@ async function parse_facets(text, counterMode = false) {
                             });
                         }
                     } else {
+                        // Handle as a regular link
                         if (!urlOrMention.startsWith('http://') && !urlOrMention.startsWith('https://')) {
                             urlOrMention = 'http://' + urlOrMention;
                         }
-                        if (!counterMode) {
-                            positionMappings.push({
-                                title: title,
-                                url: urlOrMention,
-                                isMention: false,
-                                originalStart: i,
-                                originalEnd: endParenIndex + 1,
-                                cleanedStart: cleanedText.length,
-                                cleanedEnd: cleanedText.length + title.length
-                            });
-                        }
+                        positionMappings.push({
+                            title: title,
+                            url: urlOrMention,
+                            isMention: false,
+                            originalStart: i,
+                            originalEnd: endParenIndex + 1,
+                            cleanedStart: cleanedText.length,
+                            cleanedEnd: cleanedText.length + title.length
+                        });
                     }
                     cleanedText += title;
                     i = endParenIndex + 1;
@@ -2025,21 +2029,20 @@ async function parse_facets(text, counterMode = false) {
                 }
 
                 const mention = graphemes.slice(i, endOfMentionIndex).join('');
-                if (!counterMode && mention.includes('.')) {
-                    const didResponse = await resolveHandle(mention);
-                    if (didResponse && didResponse.did) {
-                        positionMappings.push({
-                            title: mention,
-                            url: didResponse.did,
-                            isMention: true,
-                            originalStart: i,
-                            originalEnd: endOfMentionIndex,
-                            cleanedStart: cleanedText.length - mention.length,
-                            cleanedEnd: cleanedText.length
-                        });
-                    }
+                const didResponse = await resolveHandle(mention);
+                if (didResponse && didResponse.did) {
+                    cleanedText += mention;
+                    positionMappings.push({
+                        title: mention,
+                        url: didResponse.did,
+                        isMention: true,
+                        originalStart: i,
+                        originalEnd: endOfMentionIndex,
+                        cleanedStart: cleanedText.length - mention.length,
+                        cleanedEnd: cleanedText.length
+                    });
                 }
-                cleanedText += mention;
+
                 i = endOfMentionIndex;
                 continue;
             }
@@ -2053,14 +2056,13 @@ async function parse_facets(text, counterMode = false) {
     }
 
     if (!counterMode) {
-        // Process URLs and facets if not in counterMode
-        let standaloneUrls = parse_urls(cleanedText);
+        let standaloneUrls = parse_urls(cleanedText); // Ensure parse_urls can handle graphemes
         for (let urlDetail of standaloneUrls) {
             let urlPosition = cleanedText.indexOf(urlDetail.url);
             while (urlPosition !== -1) {
                 let urlLength = urlDetail.url.length;
 
-                let isOverlapping = positionMappings.some(mapping =>
+                let isOverlapping = positionMappings.some(mapping => 
                     urlPosition < mapping.cleanedEnd && (urlPosition + urlLength) > mapping.cleanedStart
                 );
 
@@ -2100,8 +2102,6 @@ async function parse_facets(text, counterMode = false) {
 
     return { facets, text: cleanedText, textLength: new GraphemeSplitter().splitGraphemes(cleanedText).length };
 }
-
-
 
 
 

@@ -1868,13 +1868,6 @@ async function resolveHandle(handle) {
     const initialShouldStartThreadAfterLogin = shouldStartThreadAfterLogin;
 
     const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
-    
-    if (obfuscatedCredentials) {
-        
-    } else {
-        shouldStartThreadAfterLogin = false;
-        document.getElementById("loginPopup").style.display = "block";
-    }
 
     handle = normalizeHandle(handle);
 
@@ -2030,19 +2023,24 @@ async function parse_facets(text, counterMode = false) {
                 }
 
                 const mention = graphemes.slice(i, endOfMentionIndex).join('');
-                let didResponse;
-                if (mention.includes('.')) didResponse = await resolveHandle(mention);
-                if (didResponse && didResponse.did) {
+                if (mention.includes('.')) {
+                    // Handle mention with dot
+                    let didResponse = await resolveHandle(mention);
+                    if (didResponse && didResponse.did) {
+                        cleanedText += mention;
+                        positionMappings.push({
+                            title: mention,
+                            url: didResponse.did,
+                            isMention: true,
+                            originalStart: i,
+                            originalEnd: endOfMentionIndex,
+                            cleanedStart: cleanedText.length - mention.length,
+                            cleanedEnd: cleanedText.length
+                        });
+                    }
+                } else {
+                    // Handle mention without dot as regular text
                     cleanedText += mention;
-                    positionMappings.push({
-                        title: mention,
-                        url: didResponse.did,
-                        isMention: true,
-                        originalStart: i,
-                        originalEnd: endOfMentionIndex,
-                        cleanedStart: cleanedText.length - mention.length,
-                        cleanedEnd: cleanedText.length
-                    });
                 }
 
                 i = endOfMentionIndex;

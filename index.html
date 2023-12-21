@@ -1988,7 +1988,8 @@ async function parse_facets(text, counterMode = false) {
 
                     // Check if it's a mention in the Markdown link
                     if (urlOrMention.startsWith('@')) {
-                        const didResponse = await resolveHandle(urlOrMention);
+                        let didResponse;
+                        if (mention.includes('.')) didResponse = await resolveHandle(mention);
                         if (didResponse && didResponse.did) {
                             positionMappings.push({
                                 title: title,
@@ -2029,7 +2030,8 @@ async function parse_facets(text, counterMode = false) {
                 }
 
                 const mention = graphemes.slice(i, endOfMentionIndex).join('');
-                const didResponse = await resolveHandle(mention);
+                let didResponse;
+                if (mention.includes('.')) didResponse = await resolveHandle(mention);
                 if (didResponse && didResponse.did) {
                     cleanedText += mention;
                     positionMappings.push({

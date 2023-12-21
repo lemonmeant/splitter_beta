@@ -1989,7 +1989,7 @@ async function parse_facets(text, counterMode = false) {
                     // Check if it's a mention in the Markdown link
                     if (urlOrMention.startsWith('@')) {
                         let didResponse;
-                        if (urlOrMention.includes('.')) didResponse = await resolveHandle(mention);
+                        if (urlOrMention.includes('.')) didResponse = await resolveHandle(urlOrMention);
                         if (didResponse && didResponse.did) {
                             positionMappings.push({
                                 title: title,

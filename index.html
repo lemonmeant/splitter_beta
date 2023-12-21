@@ -4,7 +4,7 @@
 <head>
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAGUlEQVR4nGNkYKjnYuDCj5gYiACjiuitCABd0QFzKr1RFgAAAABJRU5ErkJggg=="/>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Thread Cutter</title>
     <style>
 body {
@@ -14,6 +14,7 @@ body {
     padding: 20px;
     max-width: 600px;
     margin: 0 auto;
+    overflow-x: hidden;
 }
 
 textarea, #skeetsDisplay {
@@ -812,11 +813,22 @@ document.addEventListener('DOMContentLoaded', (event) => {
     const inputText = document.getElementById('inputText');
 
     inputText.addEventListener('input', function() {
-        let text = inputText.value;
-        text = text.replace(/ +/g, ' ') // Replace multiple spaces with a single space
-                   .replace(/\n{3,}/g, '\n\n');
+        // Save the current cursor position
+        const cursorPosition = inputText.selectionStart;
 
+        let text = inputText.value;
+
+        // Replace multiple spaces with a single space
+        text = text.replace(/ +/g, ' ');
+
+        // Limit consecutive newlines to 2
+        text = text.replace(/\n{3,}/g, '\n\n');
+
+        // Set the modified text value
         inputText.value = text;
+
+        // Restore the cursor position
+        inputText.setSelectionRange(cursorPosition, cursorPosition);
     });
 });
 
@@ -1958,10 +1970,6 @@ async function parse_facets(text, counterMode = false) {
     let graphemes = graphemeSplitter.splitGraphemes(text);
     let i = 0;
 
-    function getByteLength(str) {
-        return new TextEncoder().encode(str).length;
-    }
-
     while (i < graphemes.length) {
         try {
             // Handle Markdown links and possible mentions within them
@@ -1974,8 +1982,7 @@ async function parse_facets(text, counterMode = false) {
                     const title = graphemes.slice(i + 1, endBracketIndex).join('');
                     let urlOrMention = graphemes.slice(startParenIndex + 1, endParenIndex).join('');
 
-                    // Check if it's a mention in the Markdown link
-                    if (urlOrMention.startsWith('@')) {
+                    if (urlOrMention.startsWith('@') && urlOrMention.includes('.') && !counterMode) {
                         const didResponse = await resolveHandle(urlOrMention);
                         if (didResponse && didResponse.did) {
                             positionMappings.push({
@@ -1989,19 +1996,20 @@ async function parse_facets(text, counterMode = false) {
                             });
                         }
                     } else {
-                        // Handle as a regular link
                         if (!urlOrMention.startsWith('http://') && !urlOrMention.startsWith('https://')) {
                             urlOrMention = 'http://' + urlOrMention;
                         }
-                        positionMappings.push({
-                            title: title,
-                            url: urlOrMention,
-                            isMention: false,
-                            originalStart: i,
-                            originalEnd: endParenIndex + 1,
-                            cleanedStart: cleanedText.length,
-                            cleanedEnd: cleanedText.length + title.length
-                        });
+                        if (!counterMode) {
+                            positionMappings.push({
+                                title: title,
+                                url: urlOrMention,
+                                isMention: false,
+                                originalStart: i,
+                                originalEnd: endParenIndex + 1,
+                                cleanedStart: cleanedText.length,
+                                cleanedEnd: cleanedText.length + title.length
+                            });
+                        }
                     }
                     cleanedText += title;
                     i = endParenIndex + 1;
@@ -2017,20 +2025,21 @@ async function parse_facets(text, counterMode = false) {
                 }
 
                 const mention = graphemes.slice(i, endOfMentionIndex).join('');
-                const didResponse = await resolveHandle(mention);
-                if (didResponse && didResponse.did) {
-                    cleanedText += mention;
-                    positionMappings.push({
-                        title: mention,
-                        url: didResponse.did,
-                        isMention: true,
-                        originalStart: i,
-                        originalEnd: endOfMentionIndex,
-                        cleanedStart: cleanedText.length - mention.length,
-                        cleanedEnd: cleanedText.length
-                    });
+                if (!counterMode && mention.includes('.')) {
+                    const didResponse = await resolveHandle(mention);
+                    if (didResponse && didResponse.did) {
+                        positionMappings.push({
+                            title: mention,
+                            url: didResponse.did,
+                            isMention: true,
+                            originalStart: i,
+                            originalEnd: endOfMentionIndex,
+                            cleanedStart: cleanedText.length - mention.length,
+                            cleanedEnd: cleanedText.length
+                        });
+                    }
                 }
-
+                cleanedText += mention;
                 i = endOfMentionIndex;
                 continue;
             }
@@ -2044,13 +2053,14 @@ async function parse_facets(text, counterMode = false) {
     }
 
     if (!counterMode) {
-        let standaloneUrls = parse_urls(cleanedText); // Ensure parse_urls can handle graphemes
+        // Process URLs and facets if not in counterMode
+        let standaloneUrls = parse_urls(cleanedText);
         for (let urlDetail of standaloneUrls) {
             let urlPosition = cleanedText.indexOf(urlDetail.url);
             while (urlPosition !== -1) {
                 let urlLength = urlDetail.url.length;
 
-                let isOverlapping = positionMappings.some(mapping => 
+                let isOverlapping = positionMappings.some(mapping =>
                     urlPosition < mapping.cleanedEnd && (urlPosition + urlLength) > mapping.cleanedStart
                 );
 
@@ -2090,6 +2100,8 @@ async function parse_facets(text, counterMode = false) {
 
     return { facets, text: cleanedText, textLength: new GraphemeSplitter().splitGraphemes(cleanedText).length };
 }
+
+
 
 
 

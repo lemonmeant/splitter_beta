@@ -744,6 +744,109 @@ input[type="text"]:focus {
     position: relative;
 }
 
+/* CSS for Reply Button */
+#replyButton {
+    background-color: #1b79f3;
+    color: #f4f4f4;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+    position: relative; 
+}
+
+#replyButton:hover {
+    background-color: #679cec;
+    transform: scale(1.05);
+}
+
+#replyButton:active {
+    background-color: #454d59;
+    transform: scale(1);
+}
+
+/* CSS for Reply Modal */
+#replyPopup {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+#replyPopup .modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 30px;
+    border: none;
+    width: 40%;
+    max-width: 400px;
+    box-shadow: 0 10px 20px 0 rgba(0,0,0,0.3);
+    position: relative;
+    border-radius: 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#replyPopup .close-button {
+    color: #aaa;
+    float: right;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+}
+
+#replyPopup .close-button:hover,
+#replyPopup .close-button:focus {
+    color: #444;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#replyPopup input[type="text"] {
+    width: 100%;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    max-width: 90%;
+}
+
+#replyPopup input[type="text"]:focus {
+    border-color: #1b79f3;
+    box-shadow: 0 0 10px rgba(17, 111, 253, 0.2);
+}
+
+#replyPopup .login-button {
+    display: block;
+    margin: 20px auto;
+    padding: 12px 20px;
+    border: none;
+    background-color: #1b79f3;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+#replyPopup .login-button:hover {
+    background-color: #157ab5;
+    transform: scale(1.05);
+}
+
+
 
 
 
@@ -765,6 +868,17 @@ input[type="text"]:focus {
     </div>
     <p id="charCount">0 characters</p>
     <button id="segmentButton" data-tooltip="Click to segment your message into thread">Segment</button>
+    <button id="replyButton" data-tooltip="Click to reply to a post on BlueSky">Reply</button>
+
+<div id="replyPopup" class="modal">
+    <div class="modal-content">
+        <span class="close-button" onclick="closeReplyPopup()">&times;</span>
+        <h3>Reply to Post</h3>
+        <input type="text" id="replyToUrl" placeholder="Enter the URL of the post to reply to">
+        <button type="button" class="login-button" onclick="startReply()">Reply</button>
+    </div>
+</div>
+
     <button id="cleanButton" data-tooltip="Click to clear the text area">Clean</button>
     <button id="postThreadButton" style="background-color: #FFA500;" data-tooltip="Click to post the segmented thread to BlueSky">Post</button>
 <div class="selectors-container">
@@ -2176,8 +2290,41 @@ function saveLogsToFile() {
     }
 }
 
+const replyButton = document.getElementById('replyButton');
+replyButton.addEventListener('click', showReplyPopup);
 
-async function postThread(credentials) {
+function showReplyPopup() {
+    document.getElementById('replyPopup').style.display = 'block';
+}
+
+function closeReplyPopup() {
+    const modalContent = document.querySelector('#replyPopup .modal-content');
+    modalContent.classList.add('modal-exit');
+    setTimeout(() => {
+        document.getElementById('replyPopup').style.display = 'none';
+        modalContent.classList.remove('modal-exit');
+    }, 500);
+}
+
+async function startReply() {
+    const replyToUrl = document.getElementById('replyToUrl').value.trim();
+
+    if (replyToUrl) {
+        const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
+        
+        if (obfuscatedCredentials) {
+            const decryptedCredentials = deobfuscate(obfuscatedCredentials);
+            postThread(JSON.parse(decryptedCredentials), replyToUrl);
+        } else {
+            document.getElementById("loginPopup").style.display = "block";
+        }
+    } else {
+        alert('Please enter the URL of the post to reply to.');
+    }
+}
+
+
+async function postThread(credentials, replyToUrl = null) {
     const skeets = document.querySelectorAll('.skeet-content');
     console.log("All skeet IDs:", Array.from(skeets).map(s => s.id));
     console.log("Contents of skeetImagesMap:", [...skeetImagesMap.entries()]);
@@ -2209,8 +2356,15 @@ async function postThread(credentials) {
         let rootMetadata = null;
         let previousPostMetadata = null;
 
+        if (replyToUrl) {
+            const replyToMetadata = await getPostMetadata(replyToUrl);
+            rootMetadata = {
+                uri: replyToMetadata.uri,
+                cid: replyToMetadata.cid
+            };
+        }
+
         for (const skeet of skeets) {
-            // Use the data-facetless attribute to get the facetless version of the content
             let text = skeet.getAttribute('data-facetless');
 
             let skeetID = skeet.parentElement.parentElement.id;  
@@ -2241,11 +2395,17 @@ async function postThread(credentials) {
                         cid: previousPostMetadata.cid
                     }
                 };
+            } else if (rootMetadata) {
+                threadMetadata.reply = {
+                    root: {
+                        uri: rootMetadata.uri,
+                        cid: rootMetadata.cid
+                    }
+                };
             }
 
             const metadata = await postMessage(session, text, langs, embedImages, threadMetadata);
 
-            // Only set rootMetadata for the first post
             if (!rootMetadata) {
                 rootMetadata = {
                     uri: metadata.uri,
@@ -2253,7 +2413,6 @@ async function postThread(credentials) {
                 };
             }
 
-            // Update previousPostMetadata after each post
             previousPostMetadata = {
                 uri: metadata.uri,
                 cid: metadata.cid
@@ -2269,6 +2428,14 @@ async function postThread(credentials) {
     } finally {
         loader.style.display = 'none';
     }
+}
+
+async function getPostMetadata(postUrl) {
+    const response = await fetch(postUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch post metadata: ${response.statusText}`);
+    }
+    return response.json();
 }
 
 

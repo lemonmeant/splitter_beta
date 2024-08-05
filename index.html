@@ -744,109 +744,6 @@ input[type="text"]:focus {
     position: relative;
 }
 
-/* CSS for Reply Button */
-#replyButton {
-    background-color: #1b79f3;
-    color: #f4f4f4;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s, transform 0.3s;
-    position: relative; 
-}
-
-#replyButton:hover {
-    background-color: #679cec;
-    transform: scale(1.05);
-}
-
-#replyButton:active {
-    background-color: #454d59;
-    transform: scale(1);
-}
-
-/* CSS for Reply Modal */
-#replyPopup {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.5);
-}
-
-#replyPopup .modal-content {
-    background-color: #fefefe;
-    margin: 10% auto;
-    padding: 30px;
-    border: none;
-    width: 40%;
-    max-width: 400px;
-    box-shadow: 0 10px 20px 0 rgba(0,0,0,0.3);
-    position: relative;
-    border-radius: 12px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-#replyPopup .close-button {
-    color: #aaa;
-    float: right;
-    font-size: 30px;
-    font-weight: bold;
-    cursor: pointer;
-    position: absolute;
-    top: 10px;
-    right: 15px;
-}
-
-#replyPopup .close-button:hover,
-#replyPopup .close-button:focus {
-    color: #444;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-#replyPopup input[type="text"] {
-    width: 100%;
-    padding: 12px 15px;
-    margin: 15px 0;
-    border: 1px solid #aaa;
-    border-radius: 8px;
-    transition: border-color 0.3s, box-shadow 0.3s;
-    max-width: 90%;
-}
-
-#replyPopup input[type="text"]:focus {
-    border-color: #1b79f3;
-    box-shadow: 0 0 10px rgba(17, 111, 253, 0.2);
-}
-
-#replyPopup .login-button {
-    display: block;
-    margin: 20px auto;
-    padding: 12px 20px;
-    border: none;
-    background-color: #1b79f3;
-    color: #fff;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s, transform 0.3s;
-}
-
-#replyPopup .login-button:hover {
-    background-color: #157ab5;
-    transform: scale(1.05);
-}
-
-
 
 
 
@@ -868,17 +765,6 @@ input[type="text"]:focus {
     </div>
     <p id="charCount">0 characters</p>
     <button id="segmentButton" data-tooltip="Click to segment your message into thread">Segment</button>
-    <button id="replyButton" data-tooltip="Click to reply to a post on BlueSky">Reply</button>
-
-<div id="replyPopup" class="modal">
-    <div class="modal-content">
-        <span class="close-button" onclick="closeReplyPopup()">&times;</span>
-        <h3>Reply to Post</h3>
-        <input type="text" id="replyToUrl" placeholder="Enter the URL of the post to reply to">
-        <button type="button" class="login-button" onclick="startReply()">Reply</button>
-    </div>
-</div>
-
     <button id="cleanButton" data-tooltip="Click to clear the text area">Clean</button>
     <button id="postThreadButton" style="background-color: #FFA500;" data-tooltip="Click to post the segmented thread to BlueSky">Post</button>
 <div class="selectors-container">
@@ -2224,56 +2110,57 @@ async function parse_facets(text, counterMode = false) {
 
 
 async function postMessage(session, text, langs, embedImages, threadMetadata = {}) {
-    const { facets, text: processedText } = await parse_facets(text);
+console.log('Attempting to post message...');
     
-    let record = {
-        "$type": "app.bsky.feed.post",
-        "createdAt": new Date().toISOString(),
-        "text": processedText,
-        "langs": langs,
-        "facets": facets,
-        ...threadMetadata  // Merge threadMetadata directly into record
+const { facets, text: processedText } = await parse_facets(text);
+    
+let record = {
+    "$type": "app.bsky.feed.post",
+    "createdAt": new Date().toISOString(),
+    "text": processedText, // Use the processed text
+    "langs": langs,
+    "facets": facets,
+    ...threadMetadata  // Merge threadMetadata directly into record
+};
+
+if (embedImages && embedImages.length > 0) {
+    record["embed"] = {
+        "$type": "app.bsky.embed.images",
+        "images": embedImages.map(img => ({
+            alt: img.alt,
+            image: {
+                "$type": "blob",
+                "ref": {
+                    "$link": img.image.blob.ref.$link
+                },
+                "mimeType": img.image.blob.mimeType,
+                "size": img.image.blob.size
+            }
+        }))
     };
-
-    if (embedImages && embedImages.length > 0) {
-        record["embed"] = {
-            "$type": "app.bsky.embed.images",
-            "images": embedImages.map(img => ({
-                alt: img.alt,
-                image: {
-                    "$type": "blob",
-                    "ref": {
-                        "$link": img.image.blob.ref.$link
-                    },
-                    "mimeType": img.image.blob.mimeType,
-                    "size": img.image.blob.size
-                }
-            }))
-        };
-    }
-
-    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
-        method: 'POST',
-        headers: {
-            ...JSON_HEADERS,
-            'Authorization': `Bearer ${session['accessJwt']}`
-        },
-        body: JSON.stringify({
-            repo: session['did'],
-            collection: 'app.bsky.feed.post',
-            record: record
-        })
-    });
-
-    if (!response.ok) {
-        const responseBody = await response.json();
-        console.error('Error response body:', responseBody);
-        throw new Error(`Failed to post message: ${response.statusText}`);
-    }
-
-    return response.json();
 }
 
+const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
+    method: 'POST',
+    headers: {
+        ...JSON_HEADERS,
+        'Authorization': `Bearer ${session['accessJwt']}`
+    },
+    body: JSON.stringify({
+        repo: session['did'],
+        collection: 'app.bsky.feed.post',
+        record: record
+    })
+});
+
+if (!response.ok) {
+    const responseBody = await response.json();
+    console.error('Error response body:', responseBody);
+    throw new Error(`Failed to post message: ${response.statusText}`);
+}
+
+return response.json();
+}
 
 
 
@@ -2289,63 +2176,8 @@ function saveLogsToFile() {
     }
 }
 
-const replyButton = document.getElementById('replyButton');
-replyButton.addEventListener('click', showReplyPopup);
 
-function showReplyPopup() {
-    document.getElementById('replyPopup').style.display = 'block';
-}
-
-function closeReplyPopup() {
-    const modalContent = document.querySelector('#replyPopup .modal-content');
-    modalContent.classList.add('modal-exit');
-    setTimeout(() => {
-        document.getElementById('replyPopup').style.display = 'none';
-        modalContent.classList.remove('modal-exit');
-    }, 500);
-}
-
-async function startReply() {
-    const replyToUrl = document.getElementById('replyToUrl').value.trim();
-
-    if (replyToUrl) {
-        const obfuscatedCredentials = localStorage.getItem('obfuscatedCredentials');
-        
-        if (obfuscatedCredentials) {
-            const decryptedCredentials = deobfuscate(obfuscatedCredentials);
-            await postThread(JSON.parse(decryptedCredentials), replyToUrl);
-        } else {
-            document.getElementById("loginPopup").style.display = "block";
-        }
-    } else {
-        alert('Please enter the URL of the post to reply to.');
-    }
-}
-
-async function getPostMetadata(postUrl, session) {
-    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.getRecord`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session['accessJwt']}`
-        },
-        body: JSON.stringify({
-            collection: 'app.bsky.feed.post',
-            repo: session['did'],
-            rkey: postUrl.split('/').pop()
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch post metadata: ${response.statusText}`);
-    }
-
-    return response.json();
-}
-
-
-
-async function postThread(credentials, replyToUrl = null) {
+async function postThread(credentials) {
     const skeets = document.querySelectorAll('.skeet-content');
     console.log("All skeet IDs:", Array.from(skeets).map(s => s.id));
     console.log("Contents of skeetImagesMap:", [...skeetImagesMap.entries()]);
@@ -2377,15 +2209,8 @@ async function postThread(credentials, replyToUrl = null) {
         let rootMetadata = null;
         let previousPostMetadata = null;
 
-        if (replyToUrl) {
-            const replyToMetadata = await getPostMetadata(replyToUrl, session);
-            rootMetadata = {
-                uri: replyToMetadata.uri,
-                cid: replyToMetadata.cid
-            };
-        }
-
         for (const skeet of skeets) {
+            // Use the data-facetless attribute to get the facetless version of the content
             let text = skeet.getAttribute('data-facetless');
 
             let skeetID = skeet.parentElement.parentElement.id;  
@@ -2416,17 +2241,11 @@ async function postThread(credentials, replyToUrl = null) {
                         cid: previousPostMetadata.cid
                     }
                 };
-            } else if (rootMetadata) {
-                threadMetadata.reply = {
-                    root: {
-                        uri: rootMetadata.uri,
-                        cid: rootMetadata.cid
-                    }
-                };
             }
 
             const metadata = await postMessage(session, text, langs, embedImages, threadMetadata);
 
+            // Only set rootMetadata for the first post
             if (!rootMetadata) {
                 rootMetadata = {
                     uri: metadata.uri,
@@ -2434,6 +2253,7 @@ async function postThread(credentials, replyToUrl = null) {
                 };
             }
 
+            // Update previousPostMetadata after each post
             previousPostMetadata = {
                 uri: metadata.uri,
                 cid: metadata.cid
@@ -2451,26 +2271,6 @@ async function postThread(credentials, replyToUrl = null) {
     }
 }
 
-async function getPostMetadata(postUrl, session) {
-    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.getRecord`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session['accessJwt']}`
-        },
-        body: JSON.stringify({
-            collection: 'app.bsky.feed.post',
-            repo: session['did'],
-            uri: postUrl
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch post metadata: ${response.statusText}`);
-    }
-
-    return response.json();
-}
 
 
 

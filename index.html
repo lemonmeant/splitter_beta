@@ -2357,7 +2357,7 @@ async function postThread(credentials, replyToUrl = null) {
         let previousPostMetadata = null;
 
         if (replyToUrl) {
-            const replyToMetadata = await getPostMetadata(replyToUrl);
+            const replyToMetadata = await getPostMetadata(replyToUrl, session);
             rootMetadata = {
                 uri: replyToMetadata.uri,
                 cid: replyToMetadata.cid
@@ -2430,14 +2430,26 @@ async function postThread(credentials, replyToUrl = null) {
     }
 }
 
-async function getPostMetadata(postUrl) {
-    const response = await fetch(postUrl);
+async function getPostMetadata(postUrl, session) {
+    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.getRecord`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session['accessJwt']}`
+        },
+        body: JSON.stringify({
+            collection: 'app.bsky.feed.post',
+            repo: session['did'],
+            uri: postUrl
+        })
+    });
+
     if (!response.ok) {
         throw new Error(`Failed to fetch post metadata: ${response.statusText}`);
     }
+
     return response.json();
 }
-
 
 
 

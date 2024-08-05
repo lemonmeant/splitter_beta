@@ -2224,57 +2224,56 @@ async function parse_facets(text, counterMode = false) {
 
 
 async function postMessage(session, text, langs, embedImages, threadMetadata = {}) {
-console.log('Attempting to post message...');
+    const { facets, text: processedText } = await parse_facets(text);
     
-const { facets, text: processedText } = await parse_facets(text);
-    
-let record = {
-    "$type": "app.bsky.feed.post",
-    "createdAt": new Date().toISOString(),
-    "text": processedText, // Use the processed text
-    "langs": langs,
-    "facets": facets,
-    ...threadMetadata  // Merge threadMetadata directly into record
-};
-
-if (embedImages && embedImages.length > 0) {
-    record["embed"] = {
-        "$type": "app.bsky.embed.images",
-        "images": embedImages.map(img => ({
-            alt: img.alt,
-            image: {
-                "$type": "blob",
-                "ref": {
-                    "$link": img.image.blob.ref.$link
-                },
-                "mimeType": img.image.blob.mimeType,
-                "size": img.image.blob.size
-            }
-        }))
+    let record = {
+        "$type": "app.bsky.feed.post",
+        "createdAt": new Date().toISOString(),
+        "text": processedText,
+        "langs": langs,
+        "facets": facets,
+        ...threadMetadata  // Merge threadMetadata directly into record
     };
+
+    if (embedImages && embedImages.length > 0) {
+        record["embed"] = {
+            "$type": "app.bsky.embed.images",
+            "images": embedImages.map(img => ({
+                alt: img.alt,
+                image: {
+                    "$type": "blob",
+                    "ref": {
+                        "$link": img.image.blob.ref.$link
+                    },
+                    "mimeType": img.image.blob.mimeType,
+                    "size": img.image.blob.size
+                }
+            }))
+        };
+    }
+
+    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
+        method: 'POST',
+        headers: {
+            ...JSON_HEADERS,
+            'Authorization': `Bearer ${session['accessJwt']}`
+        },
+        body: JSON.stringify({
+            repo: session['did'],
+            collection: 'app.bsky.feed.post',
+            record: record
+        })
+    });
+
+    if (!response.ok) {
+        const responseBody = await response.json();
+        console.error('Error response body:', responseBody);
+        throw new Error(`Failed to post message: ${response.statusText}`);
+    }
+
+    return response.json();
 }
 
-const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
-    method: 'POST',
-    headers: {
-        ...JSON_HEADERS,
-        'Authorization': `Bearer ${session['accessJwt']}`
-    },
-    body: JSON.stringify({
-        repo: session['did'],
-        collection: 'app.bsky.feed.post',
-        record: record
-    })
-});
-
-if (!response.ok) {
-    const responseBody = await response.json();
-    console.error('Error response body:', responseBody);
-    throw new Error(`Failed to post message: ${response.statusText}`);
-}
-
-return response.json();
-}
 
 
 
@@ -2314,7 +2313,7 @@ async function startReply() {
         
         if (obfuscatedCredentials) {
             const decryptedCredentials = deobfuscate(obfuscatedCredentials);
-            postThread(JSON.parse(decryptedCredentials), replyToUrl);
+            await postThread(JSON.parse(decryptedCredentials), replyToUrl);
         } else {
             document.getElementById("loginPopup").style.display = "block";
         }
@@ -2322,6 +2321,28 @@ async function startReply() {
         alert('Please enter the URL of the post to reply to.');
     }
 }
+
+async function getPostMetadata(postUrl, session) {
+    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.getRecord`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session['accessJwt']}`
+        },
+        body: JSON.stringify({
+            collection: 'app.bsky.feed.post',
+            repo: session['did'],
+            rkey: postUrl.split('/').pop()
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch post metadata: ${response.statusText}`);
+    }
+
+    return response.json();
+}
+
 
 
 async function postThread(credentials, replyToUrl = null) {

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAGUlEQVR4nGNkYKjnYuDCj5gYiACjiuitCABd0QFzKr1RFgAAAABJRU5ErkJggg=="/>
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAGUlEQVR4nGNkYKjnYuDCj5gYiACjiuitCABd0QFzKr1RFgAAAABJRU5ErkJggg=="/>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Thread Cutter</title>
@@ -744,6 +744,179 @@ input[type="text"]:focus {
     position: relative;
 }
 
+#replyButton {
+    background-color: #1b79f3; 
+}
+
+#removeReplyButton {
+    background-color: #FF69B4;
+    color: #f4f4f4;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+    position: relative;
+    margin-left: 10px; 
+}
+
+#removeReplyButton:hover {
+    background-color: #679cec;
+    transform: scale(1.05);
+}
+
+#removeReplyButton:active {
+    background-color: #454d59;
+    transform: scale(1);
+}
+
+
+
+/* Modal for Reply Popup */
+#replyPopup {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+#replyPopup .modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 30px;
+    border: none;
+    width: 40%;
+    max-width: 400px;
+    box-shadow: 0 10px 20px 0 rgba(0,0,0,0.3);
+    position: relative;
+    border-radius: 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#replyPopup .close-button {
+    color: #aaa;
+    float: right;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+}
+
+#replyPopup .close-button:hover,
+#replyPopup .close-button:focus {
+    color: #444;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#replyPopup input[type="text"] {
+    width: 100%;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    max-width: 90%;
+}
+
+#replyPopup input[type="text"]:focus {
+    border-color: #1b79f3;
+    box-shadow: 0 0 10px rgba(17, 111, 253, 0.2);
+}
+
+#replyPopup .login-button {
+    display: block;
+    margin: 20px auto;
+    padding: 12px 20px;
+    border: none;
+    background-color: #1b79f3;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+#replyPopup .login-button:hover {
+    background-color: #157ab5;
+    transform: scale(1.05);
+}
+
+.dark-mode #replyPopup .modal-content {
+    background-color: #2c2c2c;
+    color: #f4f4f4;
+}
+
+.dark-mode #replyPopup .close-button {
+    color: #bbb;
+}
+
+.dark-mode #replyPopup input[type="text"] {
+    background-color: #3a3a3a;
+    color: #f4f4f4;
+    border-color: #555;
+}
+
+.dark-mode #replyPopup input[type="text"]:focus {
+    border-color: #679cec;
+    box-shadow: 0 0 10px rgba(103, 156, 236, 0.2);
+}
+
+.dark-mode #replyPopup .login-button {
+    background-color: #454d59;
+}
+
+.dark-mode #replyPopup .login-button:hover {
+    background-color: #353b45;
+}
+
+.button-container-horizontal {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+@keyframes modalOpen {
+    from {
+        opacity: 0;
+        transform: translateY(-50%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes modalClose {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-50%);
+    }
+}
+
+.modal-content {
+    animation: modalOpen 0.5s forwards;
+}
+
+.modal-exit {
+    animation: modalClose 0.5s forwards;
+}
+
+
 
 
 
@@ -760,16 +933,29 @@ input[type="text"]:focus {
     <img src="data:image/png;base64,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" alt="Thread" style="width:64px; height:64px;"/>
 </div>
     <textarea id="inputText" placeholder="Type your long post here. To divide it into separate sections, insert ## between the parts you want to split."></textarea>
-    <div style="text-align:center; margin-top:10px; color: green; font-weight: bold;">
-        Try [Unlimited Markdown](http(s)://titl.es or @mentio.ns)
+    <div style="text-align:center; margin-top:10px; color: purple; font-weight: bold;">
+        Testing Thread Replies
     </div>
     <p id="charCount">0 characters</p>
     <button id="segmentButton" data-tooltip="Click to segment your message into thread">Segment</button>
+    <button id="replyButton" data-tooltip="Reply with a thread to the post">Reply</button>
     <button id="cleanButton" data-tooltip="Click to clear the text area">Clean</button>
     <button id="postThreadButton" style="background-color: #FFA500;" data-tooltip="Click to post the segmented thread to BlueSky">Post</button>
-<div class="selectors-container">
+    <div id="replyPopup" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeReplyPopup()">&times;</span>
+            <h3>Enter the post URL you want to reply to:</h3>
+            <input type="text" id="replyPostUrl" placeholder="Enter the post URL">
+            <div class="button-container-horizontal">
+                <button type="button" class="login-button" onclick="handleReplySubmit()" data-tooltip="Click to submit the post URL">Submit</button>
+                <button id="removeReplyButton" class="login-button" onclick="removeReply()" data-tooltip="Click to remove the reply">Remove Reply</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="selectors-container">
     <div class="language-container">
-        <button id="languageButton">Choose Language</button>
+        <button id="languageButton">Language</button>
         <div id="languageDropdown" class="language-dropdown">
             <!-- Options will be dynamically populated -->
         </div>
@@ -1744,6 +1930,61 @@ function cleanTextArea() {
 const cleanButton = document.getElementById('cleanButton');
 cleanButton.addEventListener('click', cleanTextArea);
 
+let rootPostCid = null;
+
+document.getElementById('replyButton').addEventListener('click', () => {
+    document.getElementById('replyPopup').style.display = 'block';
+    showRemoveReplyButton();
+});
+
+document.getElementById('removeReplyButton').addEventListener('click', () => {
+    rootPostCid = null;
+    document.getElementById('replyButton').style.display = 'inline-block';
+    document.getElementById('removeReplyButton').style.display = 'none';
+    document.getElementById('replyButton').style.backgroundColor = '#1b79f3'; // Reset to original color
+});
+
+function showRemoveReplyButton() {
+    const removeReplyButton = document.getElementById('removeReplyButton');
+    if (rootPostCid) {
+        removeReplyButton.style.display = 'block';
+    } else {
+        removeReplyButton.style.display = 'none';
+    }
+}
+
+function removeReply() {
+    rootPostCid = null;
+    document.getElementById('replyButton').style.backgroundColor = '#1b79f3'; // Возврат к оригинальному цвету
+    showRemoveReplyButton();
+    closeReplyPopup();
+}
+
+
+async function handleReplySubmit() {
+    const postUrl = document.getElementById('replyPostUrl').value.trim();
+    try {
+        const cid = await getPostCID(postUrl);
+        rootPostCid = cid;
+        document.getElementById('replyButton').style.backgroundColor = '#FF69B4'; // Розовый цвет
+        closeReplyPopup();
+        showRemoveReplyButton();
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+
+function closeReplyPopup() {
+    document.getElementById('replyPopup').style.display = 'none';
+}
+
+
+document.addEventListener('DOMContentLoaded', (event) => {
+    showRemoveReplyButton();
+});
+
+
 const BASE_URL = 'https://bsky.social/xrpc/';
 const JSON_HEADERS = {
     'Content-Type': 'application/json'
@@ -2110,56 +2351,55 @@ async function parse_facets(text, counterMode = false) {
 
 
 async function postMessage(session, text, langs, embedImages, threadMetadata = {}) {
-console.log('Attempting to post message...');
-    
-const { facets, text: processedText } = await parse_facets(text);
-    
-let record = {
-    "$type": "app.bsky.feed.post",
-    "createdAt": new Date().toISOString(),
-    "text": processedText, // Use the processed text
-    "langs": langs,
-    "facets": facets,
-    ...threadMetadata  // Merge threadMetadata directly into record
-};
+    console.log('Attempting to post message...');
+    const { facets, text: processedText } = await parse_facets(text);
 
-if (embedImages && embedImages.length > 0) {
-    record["embed"] = {
-        "$type": "app.bsky.embed.images",
-        "images": embedImages.map(img => ({
-            alt: img.alt,
-            image: {
-                "$type": "blob",
-                "ref": {
-                    "$link": img.image.blob.ref.$link
-                },
-                "mimeType": img.image.blob.mimeType,
-                "size": img.image.blob.size
-            }
-        }))
+    let record = {
+        "$type": "app.bsky.feed.post",
+        "createdAt": new Date().toISOString(),
+        "text": processedText, // Use the processed text
+        "langs": langs,
+        "facets": facets,
+        ...threadMetadata  // Merge threadMetadata directly into record
     };
-}
 
-const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
-    method: 'POST',
-    headers: {
-        ...JSON_HEADERS,
-        'Authorization': `Bearer ${session['accessJwt']}`
-    },
-    body: JSON.stringify({
-        repo: session['did'],
-        collection: 'app.bsky.feed.post',
-        record: record
-    })
-});
+    if (embedImages && embedImages.length > 0) {
+        record["embed"] = {
+            "$type": "app.bsky.embed.images",
+            "images": embedImages.map(img => ({
+                alt: img.alt,
+                image: {
+                    "$type": "blob",
+                    "ref": {
+                        "$link": img.image.blob.ref.$link
+                    },
+                    "mimeType": img.image.blob.mimeType,
+                    "size": img.image.blob.size
+                }
+            }))
+        };
+    }
 
-if (!response.ok) {
-    const responseBody = await response.json();
-    console.error('Error response body:', responseBody);
-    throw new Error(`Failed to post message: ${response.statusText}`);
-}
+    const response = await fetchWithLogging(`${BASE_URL}com.atproto.repo.createRecord`, {
+        method: 'POST',
+        headers: {
+            ...JSON_HEADERS,
+            'Authorization': `Bearer ${session['accessJwt']}`
+        },
+        body: JSON.stringify({
+            repo: session['did'],
+            collection: 'app.bsky.feed.post',
+            record: record
+        })
+    });
 
-return response.json();
+    if (!response.ok) {
+        const responseBody = await response.json();
+        console.error('Error response body:', responseBody);
+        throw new Error(`Failed to post message: ${response.statusText}`);
+    }
+
+    return response.json();
 }
 
 
@@ -2176,12 +2416,74 @@ function saveLogsToFile() {
     }
 }
 
+async function getPostCID(postUrl) {
+    function parsePostUrl(url) {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/');
+
+        if (pathParts.length < 5) {
+            throw new Error('Invalid post URL');
+        }
+
+        const handle = pathParts[2];
+        const rkey = pathParts[4];
+        const collection = 'app.bsky.feed.post';  // Assuming the collection is always 'app.bsky.feed.post'
+
+        return { handle, collection, rkey };
+    }
+
+    async function resolveHandle(handle) {
+        const url = new URL('https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle');
+        url.searchParams.append('handle', handle);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to resolve handle');
+        }
+
+        const data = await response.json();
+        if (typeof data?.did === 'string' && data.did.startsWith('did:')) {
+            return data.did;
+        } else {
+            throw new Error('Invalid DID returned');
+        }
+    }
+
+    async function fetchPostData(repo, collection, rkey) {
+        const url = new URL('https://public.api.bsky.app/xrpc/com.atproto.repo.getRecord');
+        url.searchParams.append('repo', repo);
+        url.searchParams.append('collection', collection);
+        url.searchParams.append('rkey', rkey);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch post data');
+        }
+
+        const data = await response.json();
+        return { cid: data.cid, uri: data.uri };
+    }
+
+    const { handle, collection, rkey } = parsePostUrl(postUrl);
+    const did = await resolveHandle(handle);
+    return await fetchPostData(did, collection, rkey);
+}
+
 
 async function postThread(credentials) {
     const skeets = document.querySelectorAll('.skeet-content');
-    console.log("All skeet IDs:", Array.from(skeets).map(s => s.id));
-    console.log("Contents of skeetImagesMap:", [...skeetImagesMap.entries()]);
-
     if (skeets.length === 0) {
         alert('Please segment your message into skeets before posting.');
         return;
@@ -2209,28 +2511,34 @@ async function postThread(credentials) {
         let rootMetadata = null;
         let previousPostMetadata = null;
 
-        for (const skeet of skeets) {
-            // Use the data-facetless attribute to get the facetless version of the content
+        for (let index = 0; index < skeets.length; index++) {
+            const skeet = skeets[index];
             let text = skeet.getAttribute('data-facetless');
-
-            let skeetID = skeet.parentElement.parentElement.id;  
+            let skeetID = skeet.parentElement.parentElement.id;
             const images = skeetImagesMap.get(skeetID) || [];
             const embedImages = [];
 
             for (const imageDetails of images) {
                 const blob = await uploadImage(session, imageDetails);
-                console.log("Blob received from uploadImage:", blob);
-                
                 embedImages.push({
                     alt: imageDetails.alt,
                     image: blob
                 });
             }
-            
-            console.log("Embed Images array before post:", embedImages);
 
             let threadMetadata = {};
-            if (previousPostMetadata) {
+            if (index === 0 && rootPostCid) {
+                threadMetadata.reply = {
+                    root: {
+                        uri: rootPostCid.uri,
+                        cid: rootPostCid.cid
+                    },
+                    parent: {
+                        uri: rootPostCid.uri,
+                        cid: rootPostCid.cid
+                    }
+                };
+            } else if (previousPostMetadata) {
                 threadMetadata.reply = {
                     root: {
                         uri: rootMetadata.uri,
@@ -2245,7 +2553,6 @@ async function postThread(credentials) {
 
             const metadata = await postMessage(session, text, langs, embedImages, threadMetadata);
 
-            // Only set rootMetadata for the first post
             if (!rootMetadata) {
                 rootMetadata = {
                     uri: metadata.uri,
@@ -2253,7 +2560,6 @@ async function postThread(credentials) {
                 };
             }
 
-            // Update previousPostMetadata after each post
             previousPostMetadata = {
                 uri: metadata.uri,
                 cid: metadata.cid
@@ -2270,13 +2576,6 @@ async function postThread(credentials) {
         loader.style.display = 'none';
     }
 }
-
-
-
-
-
-
-
 
 
 async function loginAndStartThreadPosting() {
@@ -2427,7 +2726,7 @@ const languageButton = document.getElementById('languageButton');
 
 function updateLanguageButton() {
     if (selectedLanguages.length === 0) {
-        languageButton.textContent = 'Choose Language';
+        languageButton.textContent = 'Language';
     } else {
         languageButton.textContent = `${selectedLanguages.join(', ')}`;
     }
